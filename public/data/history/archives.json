@@ -1,0 +1,73 @@
+{
+  "checkedAt": "2026-11-27T13:39:46.346Z",
+  "rows": [
+    {
+      "source": "Wayback Machine",
+      "year": 2023,
+      "original": "https://www.psbank.ru/personal/saving",
+      "archiveUrl": "https://web.archive.org/web/20220519060638/https://www.psbank.ru/Personal/Saving",
+      "archivedAt": "2022-05-19",
+      "status": "archive-observation"
+    },
+    {
+      "source": "Wayback Machine",
+      "year": 2024,
+      "original": "https://www.psbank.ru/personal/saving",
+      "status": "no-snapshot"
+    },
+    {
+      "source": "Wayback Machine",
+      "year": 2025,
+      "original": "https://www.psbank.ru/personal/saving",
+      "status": "no-snapshot"
+    },
+    {
+      "source": "Wayback Machine",
+      "year": 2026,
+      "original": "https://www.psbank.ru/personal/saving",
+      "archiveUrl": "https://web.archive.org/web/20261019060958/https://www.psbank.ru/personal/saving",
+      "archivedAt": "2026-10-19",
+      "status": "archive-observation"
+    },
+    {
+      "source": "Common Crawl",
+      "original": "https://www.psbank.ru/personal/saving",
+      "year": 2025,
+      "status": "unavailable",
+      "error": "HTTP 404"
+    },
+    {
+      "source": "Wayback Machine",
+      "year": 2023,
+      "original": "https://www.psbank.ru/personal/saving/vklady-s-popolneniem",
+      "status": "no-snapshot"
+    },
+    {
+      "source": "Wayback Machine",
+      "year": 2024,
+      "original": "https://www.psbank.ru/personal/saving/vklady-s-popolneniem",
+      "status": "no-snapshot"
+    },
+    {
+      "source": "Wayback Machine",
+      "year": 2025,
+      "original": "https://www.psbank.ru/personal/saving/vklady-s-popolneniem",
+      "status": "no-snapshot"
+    },
+    {
+      "source": "Wayback Machine",
+      "year": 2026,
+      "original": "https://www.psbank.ru/personal/saving/vklady-s-popolneniem",
+      "archiveUrl": "https://web.archive.org/web/20260717104534/https://www.psbank.ru/personal/saving/vklady-s-popolneniem",
+      "archivedAt": "2026-07-17",
+      "status": "archive-observation"
+    },
+    {
+      "source": "Common Crawl",
+      "original": "https://www.psbank.ru/personal/saving/vklady-s-popolneniem",
+      "year": 2025,
+      "status": "unavailable",
+      "error": "HTTP 404"
+    }
+  ]
+}

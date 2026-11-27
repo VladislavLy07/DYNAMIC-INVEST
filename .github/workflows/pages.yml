@@ -4,38 +4,65 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: '37 4 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: dynamic-invest-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.prepare.outputs.publish }}
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run lint
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v5.0.0
+      - id: collect
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: node scripts/adapters/collect.mjs dist/data/market/snapshot.json --published
+      - id: prepare
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          EVENT: ${{ github.event_name }}
+          UPDATED: ${{ steps.collect.outputs.changed }}
+        run: |
+          if [[ "$EVENT" != schedule || "$UPDATED" == true ]]; then
+            test -s dist/index.html
+            test -s dist/data/market/snapshot.json
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-pages-artifact@v5.0.0
+        if: steps.prepare.outputs.publish == 'true'
         with:
           path: dist
+      - name: Install Chromium
+        if: github.event_name == 'pull_request'
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+        if: github.event_name == 'pull_request'
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.publish == 'true'
     needs: build
     runs-on: ubuntu-latest
     permissions:
       pages: write
       id-token: write
-    concurrency:
-      group: github-pages
-      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.publish.outputs.page_url }}
