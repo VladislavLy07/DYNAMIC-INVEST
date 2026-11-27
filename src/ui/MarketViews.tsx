@@ -72,7 +72,7 @@ export function SourceDirectory({ openEditor }: { openEditor: () => void }) {
   ].filter(record => (record.name + record.kind).toLowerCase().includes(query.trim().toLowerCase()))
   return <div className="stack">
     <section className="panel feature-panel stack">
-      <div className="panel-heading"><div><h2>Источники финансовых продуктов</h2><p>Подтверждённые тарифы пока отсутствуют в каталоге. Договорные параметры можно добавить вручную.</p></div><button className="button primary" onClick={openEditor}>Добавить инструмент</button></div>
+      <div className="panel-heading"><div><h2>Источники финансовых продуктов</h2><p>Официальные наблюдения и договорные условия хранятся отдельно. Договорные параметры можно добавить вручную.</p></div><button className="button primary" onClick={openEditor}>Добавить инструмент</button></div>
       <label className="source-search"><Search size={18}/><input aria-label="Поиск источника" placeholder="Поиск по организации и типу инструмента" value={query} onChange={e => setQuery(e.target.value)}/></label>
       <div className="source-grid">{sources.map(item => <article key={item.url} className="source-card"><p>{item.kind}</p><h3>{item.name}</h3><span className="soft-badge">{item.status}</span><a href={item.url} target="_blank" rel="noreferrer" className="text-link">Официальная страница <ArrowUpRight size={15}/></a></article>)}</div>
       {!sources.length && <p className="empty">Источники по запросу не найдены.</p>}

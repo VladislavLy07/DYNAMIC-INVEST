@@ -5,9 +5,12 @@ import { productVersions, selectProductVersions } from './catalog.ts'
 
 test('product records distinguish observations, effective periods and dates', () => {
   assert.equal(selectProductVersions(productVersions, '2024-12-31', 'asof').length, 0)
-  assert.equal(selectProductVersions(productVersions, '2024-12-31', 'year').length, 1)
-  assert.equal(selectProductVersions(productVersions, '2024-10-28', 'asof')[0]?.name, 'Мой доход')
-  assert.equal(selectProductVersions(productVersions, '2026-11-27', 'current').length, 0)
+  assert.equal(selectProductVersions(productVersions, '2024-12-31', 'year').length, 5)
+  assert.equal(selectProductVersions(productVersions, '2024-10-28', 'asof').some(row => row.name === 'Мой доход'), true)
+  assert.equal(selectProductVersions(productVersions, '2026-11-27', 'current').length, 4)
+  assert.equal(selectProductVersions(productVersions, '2026-12-03', 'current').length, 0)
+  assert.equal(selectProductVersions(productVersions, '2026-11-24', 'asof').some(row => row.evidence), false)
+  assert.equal(selectProductVersions(productVersions, '2026-11-25', 'asof').filter(row => row.evidence).length, 4)
   const valid = [ { ...productVersions[0], validFrom: '2026-06-01', validTo: '2026-06-30', publishedAt: '2026-06-01', observedAt: '2026-06-01' } ]
   assert.equal(selectProductVersions(valid, '2026-05-31', 'asof').length, 0)
   assert.equal(selectProductVersions(valid, '2026-06-30', 'current').length, 1)

@@ -1,4 +1,16 @@
-import type { Kind } from '../finance/model.ts'
+import { psbObservations, psbProductSnapshots } from './psb.ts'
+import type { Currency, Kind } from '../finance/model.ts'
+
+export interface ProductTerm {
+  rate: number | null
+  min: number | null
+  max: number | null
+  months: number | null
+  criteria: string
+  rateRange?: readonly [number, number]
+  rateCeiling?: number
+  days?: readonly [number, number]
+}
 
 export interface ProductVersion {
   productId: string
@@ -6,6 +18,8 @@ export interface ProductVersion {
   name: string
   kind: Kind
   issuer: string
+  currency?: Currency
+  evidence?: 'official-product-snapshot'
   publishedAt: string
   observedAt: string
   validFrom: string | null
@@ -14,10 +28,12 @@ export interface ProductVersion {
   source: string
   archiveUrl: string | null
   completeness: 'partial' | 'complete'
-  terms: { rate: number | null; min: number | null; max: number | null; months: number | null; criteria: string }[]
+  terms: ProductTerm[]
 }
 
 export const productVersions: ProductVersion[] = [
+  ...psbObservations,
+  ...psbProductSnapshots,
   {
     productId: 'psb-strong', versionId: 'psb-strong-2023-11-15', name: 'Сильная ставка', kind: 'Вклады', issuer: 'ПСБ',
     publishedAt: '2023-11-15', observedAt: '2023-11-15', validFrom: null, validTo: null, retrievedAt: '2026-11-27',
@@ -56,11 +72,18 @@ export const productVersions: ProductVersion[] = [
   },
 ]
 
+export const productSnapshotFreshDays = 7
+
+export function catalogSnapshotAge(version: ProductVersion, date: string) {
+  return (Date.parse(date) - Date.parse(version.observedAt)) / 86400000
+}
+
 export function selectProductVersions(versions: ProductVersion[], date: string, mode: 'year' | 'asof' | 'current') {
   return versions.filter(v => {
     if (mode === 'year') return v.observedAt.slice(0, 4) === date.slice(0, 4)
     if (v.publishedAt > date || v.observedAt > date) return false
     if (v.validFrom && v.validTo) return v.validFrom <= date && date <= v.validTo
+    if (mode === 'current' && v.evidence === 'official-product-snapshot') return catalogSnapshotAge(v, date) <= productSnapshotFreshDays
     return mode === 'asof' && v.observedAt === date
   }).sort((a, b) => b.observedAt.localeCompare(a.observedAt) || a.versionId.localeCompare(b.versionId))
 }
