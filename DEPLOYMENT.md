@@ -1,6 +1,6 @@
 # GitHub Pages
 
-Исходная проверка подтвердила Pages source GitHub Actions, успешное развёртывание main в запуске [45993444403](https://github.com/VladislavLy07/DYNAMIC-INVEST/actions/runs/45993444403) и HTTP 200 на [публичном URL](https://vladislavly07.github.io/DYNAMIC-INVEST/). На момент подготовки ветки по этому адресу работает версия 1.0.
+Исходная проверка подтвердила Pages source GitHub Actions, успешное развёртывание main в запуске [45993444403](https://github.com/VladislavLy07/DYNAMIC-INVEST/actions/runs/45993444403) и HTTP 200 на [публичном URL](https://vladislavly07.github.io/DYNAMIC-INVEST/). При проверке перед релизом 6.4 публичный сайт возвращал HTTP 200 с метаданными 5.0. Для PR запускаются сборка и Chromium, а публикация запускается из main.
 
 После одобрения и слияния ветки в main workflow проверит код, подготовит `dist/`, подтянет снимок и опубликует артефакт. Vite base — `/DYNAMIC-INVEST/`. Hash-маршрутизация позволяет открывать подстраницы без обратного серверного маршрута.
 
