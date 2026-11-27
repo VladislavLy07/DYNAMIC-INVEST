@@ -174,3 +174,14 @@ test('business case traces funnel, net new money and remuneration scenarios', ()
   assert.equal(result.commission, 120_000)
   assert.equal(result.payout[1].businessNet, 42_000)
 })
+
+
+test('confirmed carryover matches the published FNS example for paid long-term interest', () => {
+  const carryover = { opened: '2022-02-01', paid: '2023-12-31', paidAtMaturityOnly: true, confirmed: true, amount: 200000, eligibleAccrued: 75000 }
+  const result = depositTax(2023, [75000, 100000], 0, 0, 'resident', undefined, carryover)!
+  assert.equal(result.transferred, 25000)
+  assert.equal(result.taxable, 0)
+  assert.equal(result.tax, 0)
+  assert.equal(depositTax(2023, [175000], 0, 0, 'resident', undefined, { ...carryover, confirmed: false }), null)
+  assert.equal(depositTax(2023, [175000], 0, 0, 'resident', undefined, { ...carryover, opened: '2022-10-01' }), null)
+})

@@ -108,7 +108,7 @@ function App() {
   const [analysisTab, setAnalysisTab] = useState(location.hash === '#calculator' ? 'calculator' : 'analyst')
 
   useEffect(() => {
-    const onHash = () => { setPage(currentPage()); setDrawer(false); if (location.hash === '#calculator') setAnalysisTab('calculator'); window.scrollTo(0, 0) }
+    const onHash = () => { const next = currentPage(); setPage(next); if (next === 'archive') setMode('past'); setDrawer(false); if (location.hash === '#calculator') setAnalysisTab('calculator'); window.scrollTo(0, 0) }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawer(false); setPresentation(false) } }
     window.addEventListener('hashchange', onHash)
     window.addEventListener('keydown', onKey)

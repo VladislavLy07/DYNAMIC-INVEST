@@ -390,3 +390,10 @@ table, .metric-value, .large-result, .upcoming-list strong, .market-line strong,
 .catalog-terms { padding-left: 16px; margin-block: 7px; list-style: disc; }
 .catalog-terms li + li { margin-top: 8px; }
 @media (max-width: 850px) { .drawer-overlay { left: 245px; } }
+
+@media (max-width: 600px) {
+  .topbar .breadcrumb { min-width: 0; flex: 1 1 0; }
+  .topbar .breadcrumb b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar .top-actions, .topbar .top-actions > * { flex-shrink: 0; }
+  .topbar .demo-badge { padding-inline: 6px; }
+}

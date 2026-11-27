@@ -21,10 +21,10 @@ test('dashboard and its journal render at 1440, 1024, 768 and 360 pixels', async
   await expect(page.getByText('Банк России · официальные данные')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Динамика капитала' })).toBeVisible()
   await expect(page.locator('.market-line').filter({ hasText: 'Ключевая ставка' }).locator('strong')).not.toHaveText('—')
-  for (const width of [1440, 1024, 768, 360]) {
+  for (const width of [1440, 1024, 768, 360, 320]) {
     await page.setViewportSize({ width, height: width === 360 ? 820 : 960 })
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1)
-    if (width !== 768) await capture(page, 'dashboard-' + width)
+    if (width !== 320) await capture(page, 'dashboard-' + width)
   }
   await page.getByRole('button', { name: 'Открыть меню' }).click()
   await expect(page.getByRole('link', { name: 'Архив', exact: true })).toBeVisible()
@@ -124,6 +124,9 @@ test('analytic studio produces a local proposal and opens the report in either t
   await expect(page.getByRole('cell', { name: 'Оклад + процент' })).toBeVisible()
   await page.getByRole('button', { name: 'Отчёт', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Печать / PDF' })).toBeVisible()
+  const pdf = await page.pdf({ printBackground: true })
+  expect(pdf.subarray(0, 4).toString()).toBe('%PDF')
+  expect(pdf.length).toBeGreaterThan(10_000)
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 })

@@ -4,7 +4,7 @@ DYNAMIC INVEST объединяет учёт частного капитала, 
 
 ![Обзор капитала в 5.0 ULTRA](docs/screenshots/dashboard-1440.png)
 
-[Конструктор](docs/screenshots/constructor.png) · [Налоги](docs/screenshots/tax.png) · [Архив](docs/screenshots/archive.png) · [Сценарии](docs/screenshots/strategy.png) · [Презентация](docs/screenshots/presentation.png) · [1024 px](docs/screenshots/dashboard-1024.png) · [360 px](docs/screenshots/dashboard-360.png)
+[Конструктор](docs/screenshots/constructor.png) · [Налоги](docs/screenshots/tax.png) · [Архив](docs/screenshots/archive.png) · [Сценарии](docs/screenshots/strategy.png) · [Презентация](docs/screenshots/presentation.png) · [1024 px](docs/screenshots/dashboard-1024.png) · [768 px](docs/screenshots/dashboard-768.png) · [360 px](docs/screenshots/dashboard-360.png)
 
 ## Что доступно
 
