@@ -17,10 +17,7 @@ test('dashboard and its journal render at 1440, 1024, 768 and 360 pixels', async
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.goto('./')
-  await expect(page.getByRole('heading', { name: 'DYNAMIC INVEST 5.0 ULTRA' })).toBeVisible()
-  await expect(page.getByText('Банк России · официальные данные')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Динамика капитала' })).toBeVisible()
-  await expect(page.locator('.market-line').filter({ hasText: 'Ключевая ставка' }).locator('strong')).not.toHaveText('—')
+  await expect(page.getByRole('heading', { name: 'Обзор капитала' })).toBeVisible()
   for (const width of [1440, 1024, 768, 360, 320]) {
     await page.setViewportSize({ width, height: width === 360 ? 820 : 960 })
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1)
@@ -30,6 +27,10 @@ test('dashboard and its journal render at 1440, 1024, 768 and 360 pixels', async
   await expect(page.getByRole('link', { name: 'Архив', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Закрыть меню' }).click()
   await page.setViewportSize({ width: 1440, height: 960 })
+  await page.getByText('Аналитика портфеля', { exact: true }).click()
+  await expect(page.getByText('Банк России · официальные данные')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Динамика капитала' })).toBeVisible()
+  await expect(page.locator('.market-line').filter({ hasText: 'Ключевая ставка' }).locator('strong')).not.toHaveText('—')
   await page.getByRole('button', { name: /Чистый доход/ }).first().click()
   const month = page.locator('.ledger-body .ledger-toggle').first()
   if (await month.count()) {

@@ -10,6 +10,7 @@ test('shows official snapshots with dates and expands separately dated product o
   await page.clock.setFixedTime(new Date('2026-11-27T12:00:00Z'))
   await page.goto('./')
   await nav(page, 'Финансовые продукты')
+  await page.getByRole('button', { name: 'Вклады и счета ПСБ', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Последние наблюдения витрины ПСБ' })).toBeVisible()
   const vector = page.locator('.source-card').filter({ has: page.getByRole('heading', { name: 'Вектор', exact: true }) })
   await vector.getByText('Условия (2)').click()
@@ -91,7 +92,7 @@ test('downloads PDF and XLSX from the rendered projection', async ({ page }) => 
 
 test('keeps the new catalogue and analytics within phone and tablet widths', async ({ page }) => {
   const tools = [
-    ['products', '', 'Последние наблюдения витрины ПСБ'],
+    ['products', '', 'Финансовые продукты'],
     ['archive', '', 'Историческая симуляция портфеля'],
     ['tax', 'Ценные бумаги', 'НДФЛ по биржевым ценным бумагам'],
     ['analytics', 'RUB / CNY', 'Russia–China Investment Lab'],
