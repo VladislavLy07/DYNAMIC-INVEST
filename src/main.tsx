@@ -5,7 +5,7 @@ import { wealthMetrics } from './analytics/wealth'
 import { dateKey } from './finance/engine'
 import { projectLedger } from './finance/ledger'
 import { currencies, validDate, type Asset, type Currency } from './finance/model'
-import { assumptions, initialScenarios, scenarioNames, type ScenarioInput, type ScenarioName } from './features/scenarios'
+import { assumptions, initialScenarios, readAnnual, scenarioNames, type ScenarioInput, type ScenarioName } from './features/scenarios'
 import { loadSnapshot, snapshotFx, type Snapshot } from './market/snapshot'
 import { accountingFx, allocation, available, maxAssets, maxPortfolios, persistWorkspace, readWorkspace, replacePortfolio, type Portfolio, type Workspace } from './portfolio/workspace'
 import { AssetEditor, Portfolio as PositionTable } from './ui/Portfolio'
@@ -23,6 +23,10 @@ const CapitalBusinessLab = lazy(() => import('./ui/Studio').then(m => ({ default
 const ArchiveCoverage = lazy(() => import('./ui/ArchiveCoverage').then(m => ({ default: m.ArchiveCoverage })))
 const Academy = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.Academy })))
 const Analyst = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.Analyst })))
+const ChinaLab = lazy(() => import('./ui/ChinaLab').then(m => ({ default: m.ChinaLab })))
+const DividendTaxView = lazy(() => import('./ui/SecuritiesTaxView').then(m => ({ default: m.DividendTaxView })))
+const SecuritiesTaxView = lazy(() => import('./ui/SecuritiesTaxView').then(m => ({ default: m.SecuritiesTaxView })))
+const PortfolioReplay = lazy(() => import('./ui/PortfolioReplay').then(m => ({ default: m.PortfolioReplay })))
 const BacktestView = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.BacktestView })))
 const ReportView = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.ReportView })))
 const GoalsAndLadder = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.GoalsAndLadder })))
@@ -70,7 +74,7 @@ function readSettings() {
       if (!value) continue
       const keys = ['inflation', 'key', 'yield', 'spread', 'usd', 'cny', 'growth', 'tax'] as const
       if (keys.every(k => typeof value[k] === 'number' && Number.isFinite(value[k]) && value[k] > -100 && value[k] <= 100) && typeof value.early === 'boolean') {
-        scenarios[name] = Object.fromEntries([...keys.map(k => [k, value[k]]), ['early', value.early]]) as unknown as ScenarioInput
+        scenarios[name] = { ...Object.fromEntries([...keys.map(k => [k, value[k]]), ['early', value.early]]) as unknown as ScenarioInput, annual: readAnnual(value.annual) }
       }
     }
     return { theme: parsed.theme === 'dark' ? 'dark' as const : 'light' as const, watermark: parsed.watermark !== false, scenarios }
@@ -105,6 +109,7 @@ function App() {
   const [presentation, setPresentation] = useState(false)
   const [market, setMarket] = useState<Snapshot>()
   const [marketError, setMarketError] = useState('')
+  const [taxTab, setTaxTab] = useState<'bank' | 'markets' | 'dividends'>('bank')
   const [analysisTab, setAnalysisTab] = useState(location.hash === '#calculator' ? 'calculator' : 'analyst')
 
   useEffect(() => {
@@ -207,12 +212,13 @@ function App() {
           : <WealthDashboard portfolio={portfolio} metrics={metrics} projection={projection} market={market} error={marketError} today={today} fx={fx} unit={currency} watermark={settings.watermark} future={mode === 'future' || presentation} scenario={scenario}/>)}
         {projected === 'portfolio' && <div className="stack"><PortfolioSettings key={portfolio.id} portfolio={portfolio} save={changePortfolio} create={createPortfolio}/><PositionTable assets={portfolio.assets} fx={fx} edit={asset => setEditor({ asset })} duplicate={asset => setEditor({ asset, duplicate: true })} remove={setPendingRemove}/><FixedIncomeView portfolio={portfolio} start={today}/></div>}
         {projected === 'products' && <div className="stack"><ProductCatalog date={date} archive={mode === 'past'} favorites={favorites} toggle={toggleFavorite}/><SourceDirectory openEditor={() => setEditor({})}/></div>}
-        {projected === 'archive' && <div className="stack"><BacktestView key={date.slice(0, 4)} data={market} date={date}/><MarketViews data={market} date={date} error={marketError} archive/><ProductCatalog date={date} archive favorites={favorites} toggle={toggleFavorite}/><ArchiveCoverage date={date}/></div>}
-        {projected === 'tax' && <TaxView key={date.slice(0, 4)} data={market} assets={portfolio.assets} projection={projection} defaultYear={Number(date.slice(0, 4))}/>}
-        {projected === 'scenarios' && <div className="stack"><ScenarioEditor active={scenario} scenarios={settings.scenarios} edit={(key, value) => setSettings({ ...settings, scenarios: { ...settings.scenarios, [key]: value } })}/><StrategyView portfolios={data.portfolios} active={portfolio} scenarios={settings.scenarios} selected={scenario} fx={fx} today={today} months={months}/></div>}
+        {projected === 'archive' && <div className="stack"><BacktestView key={date.slice(0, 4)} data={market} date={date}/><PortfolioReplay key={date.slice(0, 4)} data={market} date={date}/><MarketViews data={market} date={date} error={marketError} archive/><ProductCatalog date={date} archive favorites={favorites} toggle={toggleFavorite}/><ArchiveCoverage date={date}/></div>}
+        {projected === 'tax' && <div className="stack"><div className="segmented analysis-tabs" aria-label="Налоговые инструменты"><button aria-pressed={taxTab === 'bank'} onClick={() => setTaxTab('bank')}>Банковские проценты</button><button aria-pressed={taxTab === 'markets'} onClick={() => setTaxTab('markets')}>Ценные бумаги</button><button aria-pressed={taxTab === 'dividends'} onClick={() => setTaxTab('dividends')}>Дивиденды</button></div>
+          {taxTab === 'bank' ? <TaxView key={date.slice(0, 4)} data={market} assets={portfolio.assets} projection={projection} defaultYear={Number(date.slice(0, 4))}/> : taxTab === 'markets' ? <SecuritiesTaxView key={date.slice(0, 4)} data={market} defaultYear={Number(date.slice(0, 4))}/> : <DividendTaxView defaultYear={Number(date.slice(0, 4))}/>}</div>}
+        {projected === 'scenarios' && <div className="stack"><ScenarioEditor firstYear={todayYear} active={scenario} scenarios={settings.scenarios} edit={(key, value) => setSettings({ ...settings, scenarios: { ...settings.scenarios, [key]: value } })}/><StrategyView portfolios={data.portfolios} active={portfolio} scenarios={settings.scenarios} selected={scenario} fx={fx} today={today} months={months}/></div>}
         {projected === 'market' && <MarketViews data={market} date={date} error={marketError}/>}
         {projected === 'calendar' && <LedgerCalendar key={portfolio.id} projection={projection}/>}
-        {projected === 'analytics' && <div className="stack"><div className="segmented analysis-tabs" aria-label="Аналитические инструменты">{[['analyst', 'Аналитик'], ['risk', 'Риски'], ['goals', 'Цели и лестница'], ['report', 'Отчёт'], ['calculator', 'Калькулятор'], ['academy', 'Академия'], ['studio', 'Private Banking Studio'], ['business', 'Capital Business Lab']].map(([key, label]) => <button key={key} aria-pressed={analysisTab === key} onClick={() => setAnalysisTab(key)}>{label}</button>)}</div>
+        {projected === 'analytics' && <div className="stack"><div className="segmented analysis-tabs" aria-label="Аналитические инструменты">{[['analyst', 'Аналитик'], ['risk', 'Риски'], ['goals', 'Цели и лестница'], ['report', 'Отчёт'], ['calculator', 'Калькулятор'], ['academy', 'Академия'], ['studio', 'Private Banking Studio'], ['business', 'Capital Business Lab'], ['china', 'RUB / CNY']].map(([key, label]) => <button key={key} aria-pressed={analysisTab === key} onClick={() => setAnalysisTab(key)}>{label}</button>)}</div>
           {analysisTab === 'analyst' && <Analyst p={portfolio} fx={fx} projection={projection}/>}
           {analysisTab === 'risk' && <RiskView portfolio={portfolio} fx={fx} projection={projection}/>}
           {analysisTab === 'goals' && <GoalsAndLadder key={portfolio.id} start={today} initial={projection.opening}/>}
@@ -221,6 +227,7 @@ function App() {
           {analysisTab === 'academy' && <Academy/>}
           {analysisTab === 'studio' && <PrivateStudio portfolio={portfolio} fx={fx} start={today} months={months} scenario={scenarioData} watermark={settings.watermark}/>}
           {analysisTab === 'business' && <CapitalBusinessLab/>}
+          {analysisTab === 'china' && <ChinaLab data={market} date={date}/>}
         </div>}
         {projected === 'settings' && <div className="stack"><section className="panel feature-panel"><h2>Оформление</h2><div className="check-list"><label><input type="checkbox" checked={settings.watermark} onChange={e => setSettings({ ...settings, watermark: e.target.checked })}/> Показывать фирменный водяной знак</label></div></section><BackupTools data={data} restore={update} append={assets => changePortfolio({ ...portfolio, assets: [...portfolio.assets, ...assets] })} clear={clearStorage}/></div>}
         </Suspense>

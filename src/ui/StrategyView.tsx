@@ -5,22 +5,31 @@ import { projectLedger } from '../finance/ledger'
 import { cagr, maximumDrawdown, xirr } from '../finance/returns'
 import type { FxRates } from '../finance/model'
 import { available, type Portfolio } from '../portfolio/workspace'
-import { assumptions, scenarioNames, type ScenarioInput, type ScenarioName } from '../features/scenarios'
+import { assumptions, scenarioFields, scenarioNames, type ScenarioInput, type ScenarioName, type ScenarioYear } from '../features/scenarios'
 import { compact, percent, rub } from './format'
 
 const chartColors = ['#0055b8', '#16866a', '#c83d4b', '#8d5bc1', '#be7e2d']
-const fields = [
-  ['inflation', 'Инфляция, % в год', -10, 50], ['key', 'Сдвиг ставки накопительных счетов, п.п.', -20, 20],
-  ['yield', 'Доходность облигаций, п.п.', -5, 5], ['spread', 'Кредитный спред, п.п.', -5, 20], ['usd', 'USD/RUB, %', -70, 100],
-  ['cny', 'CNY/RUB, %', -70, 100], ['growth', 'Прогноз цены акций, ПИФов и золота, п.п.', -70, 50], ['tax', 'Условный налог, %', 0, 50],
-] as const
-
-export function ScenarioEditor({ active, scenarios, edit }: { active: ScenarioName; scenarios: Record<ScenarioName, ScenarioInput>; edit: (key: ScenarioName, value: ScenarioInput) => void }) {
+export function ScenarioEditor({ active, scenarios, edit, firstYear }: { firstYear: number; active: ScenarioName; scenarios: Record<ScenarioName, ScenarioInput>; edit: (key: ScenarioName, value: ScenarioInput) => void }) {
   const [selected, setSelected] = useState<ScenarioName>(active)
+  const [year, setYear] = useState(firstYear)
   const scenario = scenarios[selected]
-  return <section className="panel feature-panel"><div className="panel-heading"><div><h2>Параметры экономических сценариев</h2><p>Постоянные допущения на весь горизонт. Вклады сохраняют договорную ставку.</p></div><select aria-label="Редактируемый сценарий" className="compact-select" value={selected} onChange={e => setSelected(e.target.value as ScenarioName)}>{scenarioNames.map(name => <option key={name}>{name}</option>)}</select></div>
+  const annual = scenario.annual ?? {}
+  const fields = scenarioFields
+  const createAnnual = () => Object.fromEntries(fields.map(([key]) => [key, scenario[key]])) as ScenarioYear
+  return <section className="panel feature-panel"><div className="panel-heading"><div><h2>Параметры экономических сценариев</h2><p>Базовые допущения и годовые переопределения. Вклады сохраняют договорную ставку.</p></div><select aria-label="Редактируемый сценарий" className="compact-select" value={selected} onChange={e => setSelected(e.target.value as ScenarioName)}>{scenarioNames.map(name => <option key={name}>{name}</option>)}</select></div>
     <div className="field-grid scenario-fields">{fields.map(([key, label, low, high]) => <label key={key}>{label}<span className="range-control"><input type="range" min={low} max={high} step=".5" value={scenario[key]} onChange={e => edit(selected, { ...scenario, [key]: Number(e.target.value) })}/><output>{scenario[key]}</output></span></label>)}</div>
     <div className="check-list"><label><input type="checkbox" checked={scenario.early} onChange={e => edit(selected, { ...scenario, early: e.target.checked })}/> Закрыть вклады в конце горизонта по указанным досрочным условиям</label></div>
+    <details className="contract-fields"><summary>Параметры по календарным годам ({Object.keys(annual).length})</summary>
+      <div className="toolbar wrap"><label>Год сценария<select value={year} onChange={e => setYear(Number(e.target.value))}>{Array.from({ length: 31 }, (_, i) => firstYear + i).map(value => <option key={value}>{value}</option>)}</select></label>
+        <button className="button quiet" disabled={!!annual[year]} onClick={() => edit(selected, { ...scenario, annual: { ...annual, [year]: createAnnual() } })}>Добавить параметры года</button>
+        {annual[year] && <button className="button quiet" onClick={() => edit(selected, { ...scenario, annual: Object.fromEntries(Object.entries(annual).filter(([key]) => Number(key) !== year)) })}>Вернуть базовые параметры</button>}
+      </div>
+      {annual[year] && <div className="field-grid scenario-fields">{fields.map(([key, label, min, max]) => <label key={key}>{label} · {year}<input type="number" min={min} max={max} step=".1" value={annual[year][key]} onChange={e => {
+        const value = e.target.valueAsNumber
+        if (Number.isFinite(value)) edit(selected, { ...scenario, annual: { ...annual, [year]: { ...annual[year], [key]: Math.min(max, Math.max(min, value)) } } })
+      }}/></label>)}</div>}
+      <p className="secondary">Курсовые шоки задают уровень к входному курсу, без сложения между годами. Для незаданных лет применяются базовые параметры. Прогнозный налог остаётся условным.</p>
+    </details>
   </section>
 }
 

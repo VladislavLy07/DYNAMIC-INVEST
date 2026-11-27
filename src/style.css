@@ -397,3 +397,13 @@ table, .metric-value, .large-result, .upcoming-list strong, .market-line strong,
   .topbar .top-actions, .topbar .top-actions > * { flex-shrink: 0; }
   .topbar .demo-badge { padding-inline: 6px; }
 }
+
+.export-fields { width: 100%; }
+.export-fields select, .export-fields input { min-width: 0; }
+.source-card legend { padding-inline: .3rem; color: var(--muted); font-size: .82rem; }
+.analysis-tabs { row-gap: .25rem; }
+.academy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr)); gap: 1rem; }
+.academy-grid .source-card { align-content: start; min-height: 100%; }
+.academy-grid .source-card details { width: 100%; }
+.academy-grid .source-card summary { cursor: pointer; font-weight: 600; }
+.assumption-badge { background: var(--input); border: 1px solid var(--border); border-radius: .6rem; padding: .55rem .75rem; }

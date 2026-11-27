@@ -37,7 +37,7 @@ export function eventsIcs(events: FinancialEvent[], stamp = new Date()) {
     'END:VCALENDAR', ''].map(fold).join('\r\n')
 }
 
-export function downloadFile(name: string, content: string, mime: string) {
+export function downloadFile(name: string, content: BlobPart, mime: string) {
   const href = URL.createObjectURL(new Blob([content], { type: mime }))
   const link = document.createElement('a')
   link.href = href

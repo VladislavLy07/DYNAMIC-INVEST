@@ -81,10 +81,28 @@ export function FixedIncomeView({ portfolio, start }: { portfolio: Portfolio; st
 }
 
 export function ReportView({ portfolio, projection, fx, date, watermark }: { portfolio: Portfolio; projection: Projection; fx: FxRates; date: string; watermark: boolean }) {
+  const [exporting, setExporting] = useState(false)
+  const [error, setError] = useState('')
+  async function exportReport(format: 'pdf' | 'xlsx') {
+    setExporting(true)
+    setError('')
+    try {
+      if (format === 'pdf') {
+        const { downloadPortfolioPdf } = await import('../reporting/document')
+        await downloadPortfolioPdf(portfolio, date, projection, fx)
+      } else {
+        const [{ buildWorkbook }, { reportSheets }] = await Promise.all([import('../reporting/xlsx'), import('../reporting/reportData')])
+        const bytes = buildWorkbook(reportSheets(portfolio, date, projection, fx))
+        downloadFile('dynamic-invest-report.xlsx', new Uint8Array(bytes).buffer, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      }
+    } catch (err) { setError(err instanceof Error ? err.message : 'Не удалось сформировать файл.') }
+    finally { setExporting(false) }
+  }
   return <div className="stack report-view">
     <section className={'panel feature-panel report-cover' + (watermark ? ' watermarked' : '')}>
       <img className="print-brand" src={import.meta.env.BASE_URL + 'brand/logo-light.svg'} alt="DYNAMIC INVEST"/>
-      <div className="panel-heading"><div><h2>Обзор капитала · {portfolio.name}</h2><p>Модельный финансовый отчёт · {date}</p></div><div className="toolbar wrap no-print"><button className="button primary" onClick={() => window.print()}><Printer size={16}/>Печать / PDF</button><button className="button quiet" onClick={() => downloadFile('dynamic-invest-report.csv', eventsCsv(projection.events), 'text/csv;charset=utf-8')}><Download size={16}/>События CSV</button></div></div>
+      <div className="panel-heading"><div><h2>Обзор капитала · {portfolio.name}</h2><p>Модельный финансовый отчёт · {date}</p></div><div className="toolbar wrap no-print"><button className="button primary" onClick={() => window.print()}><Printer size={16}/>Печать / PDF</button><button className="button quiet" disabled={exporting} onClick={() => void exportReport('pdf')}>Скачать PDF</button><button className="button quiet" disabled={exporting} onClick={() => void exportReport('xlsx')}>Скачать XLSX</button><button className="button quiet" onClick={() => downloadFile('dynamic-invest-report.csv', eventsCsv(projection.events), 'text/csv;charset=utf-8')}><Download size={16}/>События CSV</button></div></div>
+      {error && <p role="alert" className="notice">{error}</p>}
       <div className="large-result">{rub(projection.final.value)}</div><p>Прогноз на {projection.end} · чистый результат {rub(projection.totals.net)}</p>
       <p className="secondary">Учтены введённые комиссии {rub(projection.totals.fees)}. Условное налоговое обязательство {rub(projection.totals.assessed)} применяется только по параметрам сценария.</p>
     </section>
@@ -93,6 +111,11 @@ export function ReportView({ portfolio, projection, fx, date, watermark }: { por
 }
 
 const lessons = [
+  { title: 'Валютный спред', text: 'Курс покупки и продажи отличается от рыночного ориентира. Разница уменьшает доходность обеих валютных конверсий.', example: 'При равном официальном курсе и нашем сценарном спреде 1% на каждой стороне после обратного обмена останется примерно 98,02% первоначальной суммы.', question: 'Почему сравнивают итог в одной валюте?', answer: 'Доход в валюте размещения нужно перевести по реальному курсу выхода, чтобы сравнить покупательную способность.' },
+  { title: 'TWR и XIRR', text: 'TWR связывает доходности участков между внешними потоками. XIRR решает уравнение дисконтированных денежных потоков по точным датам.', example: 'Портфель вырос со 100 до 110, владелец внёс 100, затем капитал стал 231. TWR равен 1,10 × 1,10 − 1 = 21%.', question: 'Считать ли пополнение инвестиционным доходом?', answer: 'Нет. В TWR оно меняет базу следующего участка, а в XIRR учитывается как внешний денежный поток.' },
+  { title: 'Налоговая база по ценным бумагам', text: 'Финансовый результат реализации учитывает документированные расходы. Для пенсионных, валютных и льготных операций могут действовать отдельные правила.', example: 'Если выручка 150 000 ₽, подтверждённая стоимость покупки 130 000 ₽, а комиссия 1 000 ₽, результат до прочих корректировок равен 19 000 ₽.', question: 'Облагается ли сама переоценка до продажи?', answer: 'В обычном расчёте реализации учитывается состоявшаяся операция. Прогнозная рыночная оценка сама по себе не считается продажей.' },
+  { title: 'Данные на дату и эффект заглядывания', text: 'Исторический расчёт использует публикации, доступные участнику к моменту оценки. Дата котировки и дата публикации могут различаться.', example: 'Котировка за 15 января, опубликованная 17 января, недоступна для решения 16 января.', question: 'Можно ли заполнить прошлый пробел следующей котировкой?', answer: 'Такой приём создаёт эффект заглядывания. Понадобится доступная более ранняя цена в пределах допустимого интервала.' },
+  { title: 'Годовой сценарий и фиксированная ставка', text: 'Договорный вклад сохраняет установленную ставку. Изменения рыночных ставок отражаются на моделируемых накопительных счетах, переоценке облигаций и новых размещениях.', example: 'Если накопительный счёт имел базу 10%, а параметр нового года равен +2 п.п., модель начисляет 12% с даты смены года.', question: 'Что означает курсовой сценарий +10% в двух соседних годах?', answer: 'Оба года используют уровень +10% к исходному курсу. Дополнительного повышения на второй год нет.' },
   { title: 'Банковский процент', text: 'При простом начислении сумма не увеличивает базу следующего периода. При капитализации выплаченные проценты прибавляются к остатку.', example: '100 000 ₽ на год под 12 % простыми процентами дают 12 000 ₽ до налога.', question: 'Что станет базой после капитализации?', answer: 'Остаток вклада плюс присоединённые проценты.' },
   { title: 'Дюрация и доходность облигаций', text: 'YTM решает уравнение между полной ценой и приведённой стоимостью будущих платежей. Дюрация взвешивает сроки этих платежей.', example: 'У бескупонной бумаги с единственной выплатой через год дюрация равна одному году.', question: 'Как сдвиг доходности связан с ценой?', answer: 'Для положительной дюрации повышение доходности снижает цену при прочих равных.' },
   { title: 'Инфляция и реальная доходность', text: 'Реальная доходность измеряет изменение покупательной способности. Чистый коэффициент роста делят на индекс цен.', example: 'Рост на 10 % при инфляции 5 % даёт около 4,76 % в реальном выражении.', question: 'Достаточно ли вычесть инфляцию из номинальной ставки?', answer: 'Вычитание даёт приближение. Точный расчёт использует отношение коэффициентов.' },
@@ -102,8 +125,8 @@ const lessons = [
 export function Academy() {
   const [query, setQuery] = useState('')
   const visible = lessons.filter(item => (item.title + item.text).toLowerCase().includes(query.toLowerCase()))
-  return <section className="panel feature-panel stack"><div className="panel-heading"><div><h2>Финансовая академия</h2><p>Формулы и примеры</p></div><span className="tile blue"><BookOpen size={18}/></span></div><input placeholder="Поиск по темам" aria-label="Поиск по академии" type="search" value={query} onChange={e => setQuery(e.target.value)}/>
-    {visible.map(item => <article className="source-card" key={item.title}><h3>{item.title}</h3><p>{item.text}</p><p>{item.example}</p><details><summary>{item.question}</summary><p>{item.answer}</p></details></article>)}
+  return <section className="panel feature-panel stack"><div className="panel-heading"><div><h2>Финансовая академия</h2><p>{lessons.length} уроков с примерами и вопросами для самопроверки</p></div><span className="tile blue"><BookOpen size={18}/></span></div><input placeholder="Поиск по темам" aria-label="Поиск по академии" type="search" value={query} onChange={e => setQuery(e.target.value)}/>
+    {!visible.length && <p className="secondary" role="status">По запросу нет уроков.</p>}<div className="academy-grid">{visible.map(item => <article className="source-card" key={item.title}><h3>{item.title}</h3><p>{item.text}</p><p>{item.example}</p><details><summary>{item.question}</summary><p>{item.answer}</p></details></article>)}</div>
   </section>
 }
 
@@ -117,8 +140,10 @@ export function Analyst({ p, projection, fx }: { p: Portfolio; projection: Proje
     return {
       income: lead ? `Больше всего поступлений формирует «${lead[0]}» · ${rub(lead[1])}. Переоценка за горизонт отдельно составляет ${rub(projection.totals.valuation)}.` : 'В выбранном горизонте денежных выплат нет.',
       risk: largest && projection.opening ? `На «${largest[0]}» приходится ${percent(largest[1] / projection.opening)} начальной стоимости. Ликвидность отдельных позиций указана вручную.` : 'Добавьте позиции для оценки концентрации.',
+      real: projection.opening > 0 ? `Номинальный капитал к концу периода: ${rub(projection.final.value)}. В покупательной способности начала периода: ${rub(projection.final.real)}. Разница: ${rub(projection.final.value - projection.final.real)}.` : 'Добавьте позиции для расчёта покупательной способности.',
+      costs: `Комиссии: ${rub(projection.totals.fees)}. Подтверждённые налоговые платежи и сценарные обязательства учитываются отдельно.`,
       tax: projection.totals.assessed ? `Условное обязательство по сценарию ${rub(projection.totals.assessed)}. Правила банковского НДФЛ доступны в разделе «Налоги».` : 'В сценарии налоговое обязательство не рассчитано. Банковский НДФЛ можно оценить в разделе «Налоги».',
     }
   }, [p, projection, fx])
-  return <section className="panel feature-panel stack"><div className="panel-heading"><div><h2>Финансовый аналитик</h2><p>Локальные аналитические правила · языковая модель не подключена</p></div></div><label className="compact-control"><span>Вопрос</span><select value={prompt} onChange={e => setPrompt(e.target.value)}><option value="income">Что формирует денежный поток?</option><option value="risk">Где сосредоточен риск?</option><option value="tax">Как учтены налоги?</option></select></label><p role="status">{findings[prompt as keyof typeof findings]}</p></section>
+  return <section className="panel feature-panel stack"><div className="panel-heading"><div><h2>Финансовый аналитик</h2><p>Локальные аналитические правила · языковая модель не подключена</p></div></div><label className="compact-control"><span>Вопрос</span><select value={prompt} onChange={e => setPrompt(e.target.value)}><option value="income">Что формирует денежный поток?</option><option value="risk">Где сосредоточен риск?</option><option value="tax">Как учтены налоги?</option><option value="real">Что меняет инфляция?</option><option value="costs">Какие комиссии учтены?</option></select></label><p role="status">{findings[prompt as keyof typeof findings]}</p></section>
 }
