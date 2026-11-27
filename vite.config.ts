@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: './',
+  base: '/DYNAMIC-INVEST/',
   plugins: [tailwindcss()],
   build: {
     rollupOptions: {

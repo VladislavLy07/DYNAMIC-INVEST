@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "capital": 100000,
+  "holdings": [
+    { "asset": "EXAMPLE", "weight": 50 }
+  ],
+  "events": [
+    { "date": "2025-06-03", "type": "contribution", "amount": 10000 },
+    { "date": "2025-06-03", "type": "buy", "asset": "EXAMPLE", "quantity": 5, "price": 107, "fee": 25 },
+    { "date": "2025-06-04", "type": "income", "amount": 250 }
+  ],
+  "quotes": {
+    "EXAMPLE": [
+      { "date": "2025-06-02", "availableOn": "2025-06-02", "value": 100 },
+      { "date": "2025-06-03", "availableOn": "2025-06-03", "value": 107 },
+      { "date": "2025-06-04", "availableOn": "2025-06-04", "value": 106 }
+    ]
+  }
+}
