@@ -88,3 +88,24 @@ test('downloads PDF and XLSX from the rendered projection', async ({ page }) => 
   expect(strFromU8(zip['xl/workbook.xml'])).toContain('События')
   expect(strFromU8(zip['xl/worksheets/sheet1.xml'])).toContain('10000000')
 })
+
+test('keeps the new catalogue and analytics within phone and tablet widths', async ({ page }) => {
+  const tools = [
+    ['products', '', 'Последние наблюдения витрины ПСБ'],
+    ['archive', '', 'Историческая симуляция портфеля'],
+    ['tax', 'Ценные бумаги', 'НДФЛ по биржевым ценным бумагам'],
+    ['analytics', 'RUB / CNY', 'Russia–China Investment Lab'],
+    ['analytics', 'Отчёт', 'Динамика капитала'],
+  ]
+  for (const width of [320, 360, 768]) {
+    await page.setViewportSize({ width, height: 900 })
+    for (const [hash, button, heading] of tools) {
+      await test.step(`${width}px · ${heading}`, async () => {
+        await page.goto('./?viewport=' + width + '#' + hash)
+        if (button) await page.getByRole('button', { name: button, exact: true }).click()
+        await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1)
+      })
+    }
+  }
+})

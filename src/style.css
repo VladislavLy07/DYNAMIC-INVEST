@@ -139,6 +139,7 @@ tbody tr:hover { background: color-mix(in srgb,var(--active) 40%,var(--panel)); 
 .content-footer { display: flex; justify-content: space-between; gap: 12px; color: var(--faint); font-size: .72rem; padding: 18px 0 8px; }
 .insight { margin-top: 16px; }
 .stack, .two-column, .scenario-metrics { display: grid; gap: 16px; }
+.stack { grid-template-columns: minmax(0, 1fr); }
 .two-column { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .scenario-grid { grid-template-columns: minmax(315px, .9fr) minmax(0, 1.35fr); }
 .scenario-metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
@@ -406,4 +407,3 @@ table, .metric-value, .large-result, .upcoming-list strong, .market-line strong,
 .academy-grid .source-card { align-content: start; min-height: 100%; }
 .academy-grid .source-card details { width: 100%; }
 .academy-grid .source-card summary { cursor: pointer; font-weight: 600; }
-.assumption-badge { background: var(--input); border: 1px solid var(--border); border-radius: .6rem; padding: .55rem .75rem; }
