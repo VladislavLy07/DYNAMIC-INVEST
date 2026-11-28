@@ -85,7 +85,7 @@ function FundCard({ fund, input }: { fund: FundDisclosure; input: SlideInput }) 
       <h4>До налогообложения → После налогообложения</h4>
       <p className="mini-muted">{fund.distributes ? 'Изменение стоимости пая' : 'Доходность'} за {duration[input.months]} и прибыль в рублях</p>
       <div className="mini-result-grid">{scenarioLabels.map((name, i) => <ProjectedResults key={name} name={name} result={results[i]}/>)}</div>
-      <p className="mini-muted mini-caption">{input.model === 'resident' ? 'НДФЛ резидента по шкале 2026 года. Модель сохраняет эти правила на всём горизонте и учитывает указанную совместимую базу в год продажи.' : input.model === 'flat13' ? 'Упрощённый пример с НДФЛ 13% на положительный результат.' : 'Показан результат до налога.'} Входные и выходные комиссии, брокерский тариф и льготы не включены. Годовые допущения относятся к изменению стоимости пая после расходов фонда.</p>
+      <p className="mini-muted mini-caption">{input.model === 'resident' ? 'НДФЛ резидента по шкале 2026 года. Модель сохраняет эти правила на всём горизонте и учитывает указанную совместимую базу в год продажи.' : input.model === 'flat13' ? 'Упрощённый пример с НДФЛ 13% на положительный результат.' : input.model === 'nonresident' ? 'Для нерезидента налог по паям зависит от обстоятельств сделки. Здесь доступен результат до налога.' : 'Показан результат до налога.'} Входные и выходные комиссии, брокерский тариф и льготы не включены. Годовые допущения относятся к изменению стоимости пая после расходов фонда.</p>
       {fund.distributes && <p className="mini-muted mini-caption">КИД предусматривает выплаты по итогам квартала при наличии распределяемого дохода. Эти выплаты, их реинвестирование и налоги на них не входят в сценарий.</p>}
     </section>
     <section>
@@ -136,7 +136,7 @@ function InstrumentCard({ product, input, start, keyRate }: { product: typeof in
       {product.model ? <>
         <label className="mini-local-rate"><span>Условная годовая {product.model === 'gold' ? 'динамика цены' : 'ставка'}, %</span><input type="number" step=".1" min={product.model === 'gold' ? -99 : 0} max="100" value={rate} onChange={e => setRate(e.target.value)}/></label>
         <div className="mini-single-result"><ProjectedResults result={result}/></div>
-        <p className="mini-muted mini-caption">Модельный пример на {duration[input.months]}. {product.tax}</p>
+        <p className="mini-muted mini-caption">Модельный пример на {duration[input.months]}. {product.tax} {(['deposit', 'savings'].includes(product.id) && input.model === 'nonresident') ? 'Для нерезидента ставка 15% применяется к облагаемой части банковских процентов.' : ''}</p>
       </> : <p>{product.tax} Для расчёта нужна индивидуальная документация.</p>}
     </section>
     <section><h4>Как работает инструмент</h4><p>{product.economics}</p></section>
@@ -175,9 +175,9 @@ export function InvestmentSlides({ compact = false, start, bankCatalog, fields }
     {category !== 'bank' && <div className="mini-controls">
       <label><span>Сумма размещения, ₽</span><input type="number" min=".01" max="1000000000" step=".01" value={amount} onChange={e => setAmount(e.target.value)}/></label>
       <label><span>Горизонт расчёта</span><select value={months} onChange={e => setMonths(Number(e.target.value) as SlideHorizon)}>{slideHorizons.map(m => <option key={m} value={m}>{duration[m]}</option>)}</select></label>
-      <label><span>Налоговый режим</span><select value={model} onChange={e => setModel(e.target.value as TaxModel)}><option value="resident">Резидент · {slideTaxYear}</option><option value="flat13">Пример · 13%</option><option value="gross">До налогообложения</option></select></label>
+      <label><span>Налоговый режим</span><select value={model} onChange={e => setModel(e.target.value as TaxModel)}><option value="resident">Резидент · {slideTaxYear}</option><option value="nonresident">Нерезидент · {slideTaxYear}</option><option value="flat13">Пример · 13%</option><option value="gross">До налогообложения</option></select></label>
       {model === 'resident' && <label><span>Прочая совместимая база, ₽</span><input type="number" min="0" max="1000000000000" step=".01" value={otherBase} onChange={e => setOtherBase(e.target.value)}/></label>}
-      {category === 'other' && model === 'resident' && <label><span>Модельный максимум ключевой ставки, %</span><input type="number" min="0" max="100" step=".01" value={keyRate} onChange={e => setKeyRate(e.target.value)}/></label>}
+      {category === 'other' && (model === 'resident' || model === 'nonresident') && <label><span>Модельный максимум ключевой ставки, %</span><input type="number" min="0" max="100" step=".01" value={keyRate} onChange={e => setKeyRate(e.target.value)}/></label>}
     </div>}
     <div hidden={category !== 'funds'} className="mini-list">
       <p className="mini-list-note">Сценарная доходность до налогообложения за выбранный срок. Результаты не гарантированы.</p>

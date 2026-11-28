@@ -24,6 +24,21 @@ test('shows official snapshots with dates and expands separately dated product o
   await expect(page.getByRole('heading', { name: 'Народный вклад плюс', exact: true })).toHaveCount(0)
 })
 
+test('dated bank conditions remain available after the freshness window and support inline year selection', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-12-03T12:00:00Z'))
+  await page.goto('./#products')
+  await page.getByRole('button', { name: 'Вклады и счета ПСБ' }).click()
+  const vector = page.locator('.source-card').filter({ has: page.getByRole('heading', { name: 'Вектор', exact: true }) })
+  await expect(vector).toContainText('старше 7 дней')
+  await expect(page.getByRole('heading', { name: 'Импульс', exact: true })).toBeVisible()
+  await page.getByLabel('Год наблюдений').selectOption('2023')
+  await expect(page.getByRole('heading', { name: 'Мои возможности', exact: true })).toBeVisible()
+  await expect(vector).toHaveCount(0)
+  await page.getByLabel('Год наблюдений').selectOption('2024')
+  await expect(page.getByRole('heading', { name: 'Народный вклад плюс', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/#products$/)
+})
+
 test('replays a portfolio with dated transactions and exports reconciled historical valuations', async ({ page }) => {
   await page.goto('./#archive')
   await expect(page.getByRole('heading', { name: 'Историческая симуляция портфеля' })).toBeVisible()

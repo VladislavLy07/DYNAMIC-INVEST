@@ -8,7 +8,7 @@ import type { FundProfile } from '../market/fundDisclosures.ts'
 
 export const slideHorizons = [6, 12, 24, 36, 60] as const
 export type SlideHorizon = typeof slideHorizons[number]
-export type TaxModel = 'resident' | 'flat13' | 'gross'
+export type TaxModel = 'resident' | 'nonresident' | 'flat13' | 'gross'
 export const slideTaxYear = 2026
 export const scenarioLabels = ['Осторожный', 'Базовый', 'Оптимистичный'] as const
 export const fundRates: Record<FundProfile, readonly [number, number, number]> = {
@@ -106,9 +106,9 @@ export function instrumentScenario(input: SlideInput, kind: ModelKind, rate: num
   }
   value = new Decimal(money(value))
   let tax = null
-  if (bank && input.model === 'resident' && Number.isFinite(keyRate) && keyRate >= 0 && keyRate <= 100) {
+  if (bank && (input.model === 'resident' || input.model === 'nonresident') && Number.isFinite(keyRate) && keyRate >= 0 && keyRate <= 100) {
     const yearlyTaxes = [...incomeByYear.values()].map(interest => {
-      return depositTax(slideTaxYear, [money(interest)], 0, input.otherBase, 'resident', keyRate)?.tax
+      return depositTax(slideTaxYear, [money(interest)], 0, input.otherBase, input.model === 'nonresident' ? 'nonresident' : 'resident', keyRate)?.tax
     })
     if (yearlyTaxes.every((yearTax): yearTax is number => yearTax !== undefined)) tax = yearlyTaxes.reduce((sum, yearTax) => sum + yearTax, 0)
   }

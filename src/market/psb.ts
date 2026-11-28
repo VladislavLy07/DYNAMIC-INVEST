@@ -3,7 +3,7 @@ import type { ProductTerm, ProductVersion } from './catalog.ts'
 
 const issuer = 'ПСБ'
 const site = 'https://www.psbank.ru'
-const retrievedAt = '2026-11-27'
+const retrievedAt = '2026-11-28'
 
 function publication(id: string, name: string, kind: Kind, date: string, slug: string, terms: ProductTerm[], currency: Currency = 'RUB'): ProductVersion {
   return { productId: id, versionId: id + '-' + date, name, kind, issuer, currency, publishedAt: date, observedAt: date, validFrom: null, validTo: null,
@@ -17,6 +17,23 @@ const bankTerm = (rate: number | null, min: number | null, max: number | null, m
 export const psbObservations: ProductVersion[] = [
   publication('psb-yuan', 'Вклад в юанях', 'Вклады', '2023-10-05', press + '2023/page7',
     [{ ...bankTerm(null, null, null, null, 'Архивная сводка банка. Опубликована верхняя граница доходности.'), rate: null, rateCeiling: 3.1 }], 'CNY'),
+  publication('psb-income', 'Мой доход', 'Вклады', '2023-11-15', press + '2023/11/15-02',
+    [bankTerm(13.5, null, null, 6, 'Базовое условие из новости ПСБ.'),
+      bankTerm(12.5, null, null, 12, 'Базовое условие из новости ПСБ.')]),
+  publication('psb-benefit', 'Моя выгода', 'Вклады', '2023-11-15', press + '2023/11/15-02',
+    [{ ...bankTerm(null, null, null, null, 'Архивная верхняя граница. Депозиты этой линейки предлагались на срок от 6 месяцев до 2 лет.'), rateCeiling: 13 }]),
+  publication('psb-moneybox', 'Моя копилка', 'Вклады', '2023-11-15', press + '2023/11/15-02',
+    [{ ...bankTerm(null, null, null, null, 'Архивное предложение с пополнением.'), rateCeiling: 10.6 }]),
+  publication('psb-opportunities', 'Мои возможности', 'Вклады', '2023-11-15', press + '2023/11/15-02',
+    [{ ...bankTerm(null, null, null, null, 'Архивное предложение с пополнением и частичным снятием.'), rateCeiling: 9.6 }]),
+  publication('psb-accent', 'Акцент на процент', 'Накопительные счета', '2023-11-15', press + '2023/11/15-02',
+    [bankTerm(9, null, null, null, 'Базовая ставка по датированной публикации.')]),
+  publication('psb-spare', 'Про запас', 'Накопительные счета', '2023-11-15', press + '2023/11/15-02',
+    [bankTerm(9, null, null, null, 'Базовая ставка по датированной публикации.')]),
+  publication('psb-unlimited', 'Безлимитный', 'Накопительные счета', '2023-11-15', press + '2023/11/15-02',
+    [bankTerm(12, 5000, null, null, 'Архивное условие по сумме.')]),
+  publication('psb-victory', 'Вклад в Победу', 'Вклады', '2026-09-07', press + '2026/09/07-02',
+    [{ ...bankTerm(null, 50000, 10000000, 6, 'Доходность из новости банка для указанного срока и диапазона сумм.'), rateCeiling: 14.3 }]),
   publication('psb-capital', 'ПСБ Капитал', 'Накопительные счета', '2024-05-31', press + '2024/05/31-02',
     [bankTerm(14, null, null, null, 'Private Banking. Начисление на ежедневный остаток.')]),
   publication('psb-strong', 'Сильная ставка', 'Вклады', '2024-10-28', press + '2024/10/28-01',
@@ -60,4 +77,36 @@ export const psbProductSnapshots: ProductVersion[] = [
   snapshot('psb-yuan', 'Вклад в юанях', 'Вклады', '/personal/saving', [
     { ...bankTerm(null, 10000, null, null, 'Диапазон витрины для депозита в китайских юанях.'), rateRange: [2.5, 3.5], days: [91, 731] },
   ], 'CNY'),
+]
+
+const indexCheckDate = '2026-11-28'
+function indexed(id: string, name: string, kind: Kind, path: string, terms: ProductTerm[]): ProductVersion {
+  return { ...publication(id, name, kind, indexCheckDate, path, terms), evidence: 'official-index' }
+}
+
+const savings = '/personal/savingsaccount'
+export const psbIndexedObservations: ProductVersion[] = [
+  indexed('psb-impulse', 'Импульс', 'Накопительные счета', savings, [
+    bankTerm(16, null, null, 2, 'Приветственная ставка для новых клиентов. Уточните лимит остатка и порядок начисления.'),
+    bankTerm(9, null, null, null, 'Базовая ставка из витрины.'),
+  ]),
+  indexed('psb-accent', 'Акцент на процент', 'Накопительные счета', savings + '/accentpercent', [
+    { ...bankTerm(null, null, null, null, 'На ежедневный остаток. Доход зависит от объёма покупок по карте и применимых условий.'), rateCeiling: 14 },
+  ]),
+  ...([
+    ['psb-spare', 'Про запас', '27.10.2026'],
+    ['psb-keeper', 'Хранитель', '27.10.2026'],
+    ['psb-atlant', 'Атлант', '11.11.2025'],
+    ['psb-narodny-account', 'Народный счёт', '17.10.2025'],
+    ['psb-unlimited', 'Безлимитный', '12.03.2025'],
+    ['psb-samolet', 'Копим с Самолётом', '01.10.2024'],
+  ] as const).map(([id, name, before]) => indexed(id, name, 'Накопительные счета', savings, [
+    bankTerm(null, null, null, null, `Архивный счёт. Банк публикует условия обслуживания для счетов, открытых до ${before}.`),
+  ])),
+  indexed('psb-future', 'Ставка на будущее', 'Вклады', '/personal/saving/stavka-na-budushchee', [
+    bankTerm(null, 30000, null, null, 'Вклад для участников программы долгосрочных сбережений НПФ ПСБ. Сумма ограничена первым взносом по договору ПДС. Сверьте редакцию условий.'),
+  ]),
+  indexed('psb-moneybox', 'Моя копилка', 'Вклады', '/personal/saving/mymoneybox', [
+    bankTerm(null, null, null, null, 'Вклад с пополнением и ежемесячной выплатой процентов. Доступность открытия и ставку уточняйте по действующим условиям.'),
+  ]),
 ]

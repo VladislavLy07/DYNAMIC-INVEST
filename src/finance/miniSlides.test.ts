@@ -62,3 +62,13 @@ test('official fund snapshot has 12 open and 4 exchange products with unique rul
   assert.equal(fundDisclosures[0].history[12], 15.45)
   assert.equal(fundDisclosures[2].annualFee, 1.94)
 })
+
+test('bank mini-slides apply both residency modes to interest after the annual allowance', () => {
+  const input = { ...base, amount: 3_000_000 }
+  const resident = instrumentScenario(input, 'deposit', .12, '2026-01-01', 21)!
+  const nonresident = instrumentScenario({ ...input, model: 'nonresident' }, 'deposit', .12, '2026-01-01', 21)!
+  assert.equal(resident.grossProfit, 360_000)
+  assert.equal(resident.tax, 19_500)
+  assert.equal(nonresident.tax, 22_500)
+  assert.equal(fundScenario({ ...input, model: 'nonresident' }, .12)?.tax, null)
+})
