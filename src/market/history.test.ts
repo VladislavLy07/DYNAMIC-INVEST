@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { availableAt, decodeSnapshot, supportedSource } from './snapshot.ts'
-import { productVersions, selectProductVersions } from './catalog.ts'
+import { latestBankObservations, productVersions, selectProductVersions } from './catalog.ts'
 
 test('product records distinguish observations, effective periods and dates', () => {
   assert.equal(selectProductVersions(productVersions, '2024-12-31', 'asof').length, 0)
@@ -25,4 +25,13 @@ test('market lookups require valid ordered snapshots and never use future observ
   assert.equal(availableAt(snapshot.sources.key, '2023-12-31'), undefined)
   assert.throws(() => decodeSnapshot({ version: 1, collectedAt: stamp, sources: { key: { ...key, series: [...points].reverse() } } }), /Повреждён/)
   assert.equal(supportedSource('https://www.cbr.ru.attacker.example/'), false)
+})
+
+test('the bank catalogue keeps dated products after expiry and deduplicates versions', () => {
+  const actual = latestBankObservations(productVersions, '2026-12-03')
+  assert.equal(actual.find(item => item.productId === 'psb-vector')?.observedAt, '2026-11-25')
+  assert.equal(actual.find(item => item.productId === 'psb-impulse')?.evidence, 'official-index')
+  assert.equal(new Set(actual.map(item => item.productId)).size, actual.length)
+  assert.ok(actual.every(item => item.issuer === 'ПСБ'))
+  assert.equal(latestBankObservations(productVersions, '2023-12-31').some(item => item.evidence === 'official-index'), false)
 })

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Activity, Archive, BriefcaseBusiness, CalendarDays, Compass, FlaskConical, Globe2, House, Menu, Moon, PanelsTopLeft, Plus, Presentation, ReceiptText, Settings, Sun, X } from 'lucide-react'
+import { Activity, Archive, BriefcaseBusiness, CalendarDays, ChevronDown, Compass, FlaskConical, Globe2, House, Menu, Moon, PanelsTopLeft, Plus, Presentation, ReceiptText, Settings, Sun, X } from 'lucide-react'
 import { wealthMetrics } from './analytics/wealth'
 import { dateKey } from './finance/engine'
 import { projectLedger } from './finance/ledger'
@@ -16,6 +16,7 @@ import { LedgerCalendar } from './ui/LedgerViews'
 import { TaxView } from './ui/TaxView'
 import { ProductCatalog, favoritesKey } from './ui/ProductCatalog'
 import { ScenarioEditor, StrategyView } from './ui/StrategyView'
+import { InvestmentSlides, useInvestmentInputs } from './ui/InvestmentSlides'
 import './style.css'
 
 const PrivateStudio = lazy(() => import('./ui/Studio').then(m => ({ default: m.PrivateStudio })))
@@ -88,6 +89,7 @@ function ConfirmRemoval({ asset, close, remove }: { asset: Asset; close: () => v
 }
 
 function App() {
+  const investmentInputs = useInvestmentInputs()
   const [page, setPage] = useState(currentPage)
   const [settings, setSettings] = useState(readSettings)
   const [drawer, setDrawer] = useState(false)
@@ -171,6 +173,19 @@ function App() {
     setDrawer(false)
   }
 
+  const globalControls = <div className="global-controls">
+    <div className="segmented mode-tabs" aria-label="Временной режим">{(['past', 'present', 'future'] as const).map((m, i) => <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)}>{['Прошлое', 'Настоящее', 'Будущее'][i]}</button>)}</div>
+    {mode === 'past' ? <>
+      <label className="compact-control"><span>Год</span><select aria-label="Год" value={historical.slice(0, 4)} onChange={e => setHistorical(e.target.value === String(todayYear) ? today : e.target.value + '-12-31')}>{Array.from({ length: Math.max(1, todayYear - 2022) }, (_, i) => 2023 + i).map(year => <option key={year}>{year}</option>)}</select></label>
+      <label className="compact-control"><span>Дата</span><input type="date" min="2023-01-01" max={today} value={historical} onChange={e => { if (validDate(e.target.value) && e.target.value <= today && e.target.value >= '2023-01-01') setHistorical(e.target.value) }}/></label>
+    </> : <span className="control-date"><CalendarDays size={15}/>{today}</span>}
+    <label className="compact-control"><span>Портфель</span><select value={data.active} onChange={e => update({ ...data, active: e.target.value })}>{data.portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+    <label className="compact-control"><span>Горизонт</span><select aria-label="Горизонт" value={custom ? 'custom' : months} onChange={e => { setCustom(e.target.value === 'custom'); if (e.target.value !== 'custom') setMonths(Number(e.target.value)) }}>{horizons.map(m => <option key={m} value={m}>{periodLabel(m)}</option>)}<option value="custom">Свой</option></select></label>
+    {custom && <label className="compact-control custom-months"><span>Месяцев</span><input type="number" min={1} max={360} value={months} onChange={e => setMonths(Math.min(360, Math.max(1, Math.floor(Number(e.target.value)))))}/></label>}
+    <label className="compact-control"><span>Сценарий</span><select value={scenario} onChange={e => setScenario(e.target.value as ScenarioName)}>{scenarioNames.map(name => <option key={name}>{name}</option>)}</select></label>
+    <label className="compact-control"><span>Валюта</span><select value={currency} onChange={e => setCurrency(e.target.value as Currency)}>{currencies.map(code => <option key={code}>{code}</option>)}</select></label>
+  </div>
+
   return <div className={'app-shell' + (presentation ? ' presentation' : '')}>
     {drawer && <button className="drawer-overlay" aria-label="Закрыть меню" onClick={() => setDrawer(false)}/>}
     <aside className={`sidebar ${drawer ? 'drawer-open' : ''}`} aria-label="Разделы приложения">
@@ -181,37 +196,30 @@ function App() {
         <div className="nav-caption nav-divider">ИНСТРУМЕНТЫ</div>
         {secondary.map(key => { const { label, icon: Icon } = pages[key]; return <a key={key} href={`#${key}`} aria-current={key === page ? 'page' : undefined} onClick={() => navigate(key)}><Icon size={18}/>{label}</a> })}
       </nav>
-      <div className="sidebar-footer"><div className="workspace"><span className="workspace-icon"><Activity size={16}/></span><div><b>Частный капитал</b><span>Локальное хранилище</span></div></div><div className="version"><span>5.0 ULTRA</span><span>В разработке</span></div></div>
+      <div className="sidebar-footer"><div className="workspace"><span className="workspace-icon"><Activity size={16}/></span><div><b>Частный капитал</b><span>Локальное хранилище</span></div></div><div className="version"><span>Версия 6.4</span></div></div>
     </aside>
     <div className="main-shell">
       <header className="topbar">
         <div className="breadcrumb"><button className="icon-button menu-button" aria-label="Открыть меню" aria-expanded={drawer} onClick={() => setDrawer(!drawer)}>{drawer ? <X size={21}/> : <Menu size={21}/>}</button><span>Рабочая область</span><span className="crumb-sep">/</span><b>{presentation ? 'Демонстрация' : current.label}</b></div>
-        <div className="top-actions">{portfolio.demo && <span className="demo-badge"><span/>Демопортфель</span>}
+        <div className="top-actions">{portfolio.demo && projected !== 'dashboard' && projected !== 'products' && <span className="demo-badge"><span/>Демопортфель</span>}
           <button className="icon-button theme-button" aria-label={settings.theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'} onClick={() => setSettings({ ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' })}>{settings.theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button>
           <button className="icon-button theme-button" aria-label={presentation ? 'Выйти из презентации' : 'Открыть презентацию'} aria-pressed={presentation} onClick={() => { setPresentation(!presentation); window.scrollTo(0, 0) }}>{presentation ? <X size={18}/> : <Presentation size={18}/>}</button>
         </div>
       </header>
       <main>
-        {!presentation && <div className="global-controls">
-          <div className="segmented mode-tabs" aria-label="Временной режим">{(['past', 'present', 'future'] as const).map((m, i) => <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)}>{['Прошлое', 'Настоящее', 'Будущее'][i]}</button>)}</div>
-          {mode === 'past' ? <>
-            <label className="compact-control"><span>Год</span><select aria-label="Год" value={historical.slice(0, 4)} onChange={e => setHistorical(e.target.value === String(todayYear) ? today : e.target.value + '-12-31')}>{Array.from({ length: Math.max(1, todayYear - 2022) }, (_, i) => 2023 + i).map(year => <option key={year}>{year}</option>)}</select></label>
-            <label className="compact-control"><span>Дата</span><input type="date" min="2023-01-01" max={today} value={historical} onChange={e => { if (validDate(e.target.value) && e.target.value <= today && e.target.value >= '2023-01-01') setHistorical(e.target.value) }}/></label>
-          </> : <span className="control-date"><CalendarDays size={15}/>{today}</span>}
-          <label className="compact-control"><span>Портфель</span><select value={data.active} onChange={e => update({ ...data, active: e.target.value })}>{data.portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-          <label className="compact-control"><span>Горизонт</span><select aria-label="Горизонт" value={custom ? 'custom' : months} onChange={e => { setCustom(e.target.value === 'custom'); if (e.target.value !== 'custom') setMonths(Number(e.target.value)) }}>{horizons.map(m => <option key={m} value={m}>{periodLabel(m)}</option>)}<option value="custom">Свой</option></select></label>
-          {custom && <label className="compact-control custom-months"><span>Месяцев</span><input type="number" min={1} max={360} value={months} onChange={e => setMonths(Math.min(360, Math.max(1, Math.floor(Number(e.target.value)))))}/></label>}
-          <label className="compact-control"><span>Сценарий</span><select value={scenario} onChange={e => setScenario(e.target.value as ScenarioName)}>{scenarioNames.map(name => <option key={name}>{name}</option>)}</select></label>
-          <label className="compact-control"><span>Валюта</span><select value={currency} onChange={e => setCurrency(e.target.value as Currency)}>{currencies.map(code => <option key={code}>{code}</option>)}</select></label>
-        </div>}
+        {!presentation && (page === 'dashboard' || page === 'products' ? <details className="workspace-controls"><summary>Параметры портфеля <ChevronDown size={15}/></summary>{globalControls}</details> : globalControls)}
         {projected !== 'dashboard' && <div className="page-heading"><div><h1>{current.title}</h1><p>{current.subtitle}</p></div>{page === 'portfolio' && <button className="button primary" onClick={() => setEditor({})}><Plus size={18}/>Добавить актив</button>}</div>}
         {message && <p className="notice" role="status">{message}</p>}
         <Suspense fallback={<div className="panel empty" role="status">Загрузка раздела…</div>}>
         {projected === 'dashboard' && (mode === 'past' && !presentation
           ? <HistoricalHome data={market} date={date} error={marketError}/>
-          : <WealthDashboard portfolio={portfolio} metrics={metrics} projection={projection} market={market} error={marketError} today={today} fx={fx} unit={currency} watermark={settings.watermark} future={mode === 'future' || presentation} scenario={scenario}/>)}
+          : <WealthDashboard portfolio={portfolio} metrics={metrics} projection={projection} market={market} error={marketError} today={today} fx={fx} unit={currency} watermark={settings.watermark} future={mode === 'future' || presentation} scenario={scenario} presentation={presentation} investmentPreview={<InvestmentSlides compact start={today} fields={investmentInputs}/>}/>)}
         {projected === 'portfolio' && <div className="stack"><PortfolioSettings key={portfolio.id} portfolio={portfolio} save={changePortfolio} create={createPortfolio}/><PositionTable assets={portfolio.assets} fx={fx} edit={asset => setEditor({ asset })} duplicate={asset => setEditor({ asset, duplicate: true })} remove={setPendingRemove}/><FixedIncomeView portfolio={portfolio} start={today}/></div>}
-        {projected === 'products' && <div className="stack"><ProductCatalog date={date} archive={mode === 'past'} favorites={favorites} toggle={toggleFavorite}/><SourceDirectory openEditor={() => setEditor({})}/></div>}
+        {projected === 'products' && <div className="stack">
+          {mode === 'past' ? <ProductCatalog date={date} archive favorites={favorites} toggle={toggleFavorite}/> :
+            <InvestmentSlides start={today} fields={investmentInputs} bankCatalog={<ProductCatalog date={date} archive={false} favorites={favorites} toggle={toggleFavorite}/>}/>}
+          <details className="workspace-controls"><summary>Источники и ручной ввод <ChevronDown size={15}/></summary><SourceDirectory openEditor={() => setEditor({})}/></details>
+        </div>}
         {projected === 'archive' && <div className="stack"><BacktestView key={date.slice(0, 4)} data={market} date={date}/><PortfolioReplay key={date.slice(0, 4)} data={market} date={date}/><MarketViews data={market} date={date} error={marketError} archive/><ProductCatalog date={date} archive favorites={favorites} toggle={toggleFavorite}/><ArchiveCoverage date={date}/></div>}
         {projected === 'tax' && <div className="stack"><div className="segmented analysis-tabs" aria-label="Налоговые инструменты"><button aria-pressed={taxTab === 'bank'} onClick={() => setTaxTab('bank')}>Банковские проценты</button><button aria-pressed={taxTab === 'markets'} onClick={() => setTaxTab('markets')}>Ценные бумаги</button><button aria-pressed={taxTab === 'dividends'} onClick={() => setTaxTab('dividends')}>Дивиденды</button></div>
           {taxTab === 'bank' ? <TaxView key={date.slice(0, 4)} data={market} assets={portfolio.assets} projection={projection} defaultYear={Number(date.slice(0, 4))}/> : taxTab === 'markets' ? <SecuritiesTaxView key={date.slice(0, 4)} data={market} defaultYear={Number(date.slice(0, 4))}/> : <DividendTaxView defaultYear={Number(date.slice(0, 4))}/>}</div>}

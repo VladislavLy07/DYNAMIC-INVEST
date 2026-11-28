@@ -1,4 +1,4 @@
-import { psbObservations, psbProductSnapshots } from './psb.ts'
+import { psbIndexedObservations, psbObservations, psbProductSnapshots } from './psb.ts'
 import type { Currency, Kind } from '../finance/model.ts'
 
 export interface ProductTerm {
@@ -19,7 +19,7 @@ export interface ProductVersion {
   kind: Kind
   issuer: string
   currency?: Currency
-  evidence?: 'official-product-snapshot'
+  evidence?: 'official-product-snapshot' | 'official-index'
   publishedAt: string
   observedAt: string
   validFrom: string | null
@@ -34,6 +34,7 @@ export interface ProductVersion {
 export const productVersions: ProductVersion[] = [
   ...psbObservations,
   ...psbProductSnapshots,
+  ...psbIndexedObservations,
   {
     productId: 'psb-strong', versionId: 'psb-strong-2023-11-15', name: 'Сильная ставка', kind: 'Вклады', issuer: 'ПСБ',
     publishedAt: '2023-11-15', observedAt: '2023-11-15', validFrom: null, validTo: null, retrievedAt: '2026-11-27',
@@ -86,4 +87,13 @@ export function selectProductVersions(versions: ProductVersion[], date: string, 
     if (mode === 'current' && v.evidence === 'official-product-snapshot') return catalogSnapshotAge(v, date) <= productSnapshotFreshDays
     return mode === 'asof' && v.observedAt === date
   }).sort((a, b) => b.observedAt.localeCompare(a.observedAt) || a.versionId.localeCompare(b.versionId))
+}
+
+// The catalogue keeps the last observation, even after it stops qualifying as fresh.
+export function latestBankObservations(versions: ProductVersion[], date: string) {
+  const latest = new Map<string, ProductVersion>()
+  const confirmed = versions.filter(row => row.issuer === 'ПСБ' && row.observedAt <= date && row.publishedAt <= date)
+    .sort((a, b) => b.observedAt.localeCompare(a.observedAt))
+  for (const row of confirmed) if (!latest.has(row.productId)) latest.set(row.productId, row)
+  return [...latest.values()]
 }
