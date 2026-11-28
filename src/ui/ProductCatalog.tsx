@@ -1,56 +1,122 @@
-import { useState } from 'react'
-import { ArrowUpRight, Star } from 'lucide-react'
-import { catalogSnapshotAge, latestBankObservations, productSnapshotFreshDays, productVersions, selectProductVersions, type ProductTerm, type ProductVersion } from '../market/catalog'
-import { rub } from './format'
-import type { Currency } from '../finance/model'
+import { addMonths, daysBetween } from '../finance/engine'
+import { bankProjection, bankScenarios, type BankParameters } from '../finance/bankSlides'
+import { slideHorizons } from '../finance/miniSlides'
+import { latestBankObservations, productVersions, type ProductTerm, type ProductVersion } from '../market/catalog'
+import { taxSource } from '../tax/deposits'
+import { Detail, Disclosure, Link, displayDate, duration, pct, rub } from './InvestmentSlides'
 
-const decimal = (n: number) => n.toLocaleString('ru-RU', { maximumFractionDigits: 4 })
-const rateText = (t: ProductTerm) => t.rateRange ? t.rateRange.map(decimal).join('–') + ' %'
-  : t.rateCeiling !== undefined ? 'До ' + decimal(t.rateCeiling) + ' %' : t.rate === null ? 'Ставка не указана' : decimal(t.rate) + ' %'
-const termText = (t: ProductTerm) => t.days ? t.days.join('–') + ' дн.' : t.months ? t.months + ' мес.' : '—'
-const amount = (n: number, currency: Currency = 'RUB') => currency === 'RUB' ? rub(n) : decimal(n) + ' ' + currency
+const decimal = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 4 })
+const rateText = (term: ProductTerm) => term.rateRange ? term.rateRange.map(value => decimal.format(value)).join('–') + ' %'
+  : term.rateCeiling !== undefined ? 'До ' + decimal.format(term.rateCeiling) + ' %'
+    : term.rate === null ? 'Ставка не указана' : pct(term.rate / 100)
+const termText = (term: ProductTerm) => term.termDays ? term.termDays.join(' / ') + ' дн.'
+  : term.fixedDays ? term.fixedDays + ' дн.' : term.days ? term.days.join('–') + ' дн.'
+    : term.months ? term.months + ' мес.' : 'Срок не указан'
+const amountText = (amount: number, row: ProductVersion) => row.currency === 'CNY' ? decimal.format(amount) + ' ¥' : rub(amount)
 
-function observationLabel(item: ProductVersion, date: string) {
-  if (item.evidence === 'official-index') return 'Проверка индексированной страницы ПСБ'
-  if (item.evidence === 'official-product-snapshot') {
-    return catalogSnapshotAge(item, date) > productSnapshotFreshDays ? 'Датированный снимок · старше 7 дней' : 'Снимок официальной витрины'
-  }
-  return 'Датированная публикация'
+const descriptions: Record<string, string> = {
+  'psb-income': 'Проценты по срочному вкладу',
+  'psb-strong': 'Ставка для новых денег',
+  'psb-invest-income': 'Вклад с покупкой паёв',
+  'psb-victory': 'Вклад с благотворительной акцией',
+  'psb-stable': 'Выплата процентов ежемесячно',
+  'psb-moneybox': 'Вклад с пополнением',
+  'psb-opportunities': 'Пополнение и частичное снятие',
+  'psb-social': 'Для получателей соцподдержки',
+  'psb-future': 'Для участников ПДС',
+  'psb-metal': 'Вклад при покупке металла',
+  'psb-impulse': 'Приветственная ставка',
+  'psb-accent': 'Ставка зависит от покупок',
+  'psb-vector': 'Два способа учёта остатка',
 }
 
-export const favoritesKey = 'dynamic-invest:favorites:v1'
+function bankStatus(item: ProductVersion, historical: boolean) {
+  if (item.storefront === 'archived') return 'Архивный продукт'
+  if (historical) return 'Историческое наблюдение'
+  if (item.evidence === 'official-product-snapshot') return 'Датированный снимок'
+  if (item.evidence === 'official-index') return 'Индекс витрины ПСБ'
+  return 'Публикация от ' + displayDate(item.observedAt)
+}
 
-export function ProductCatalog({ date, archive, favorites, toggle }: { date: string; archive: boolean; favorites: string[]; toggle: (key: string) => void }) {
-  const [mode, setMode] = useState<'year' | 'asof'>('year')
-  const [query, setQuery] = useState('')
-  const [favoriteOnly, setFavoriteOnly] = useState(false)
-  const [compare, setCompare] = useState<string[]>([])
-  const [kind, setKind] = useState('')
-  const [ascending, setAscending] = useState(false)
-  const [bankYear, setBankYear] = useState('')
-  const yearDate = bankYear ? bankYear + '-12-31' : date
-  const bankRows = bankYear
-    ? selectProductVersions(productVersions, yearDate, 'year').filter(row => row.issuer === 'ПСБ' && row.observedAt <= date)
-    : latestBankObservations(productVersions, date)
-  const items = (archive ? selectProductVersions(productVersions, date, mode) : bankRows)
-    .filter(p => (!kind || p.kind === kind) && (!favoriteOnly || favorites.includes(p.productId)) &&
-      (p.name + ' ' + p.issuer).toLowerCase().includes(query.toLowerCase().trim()))
-    .sort((a, b) => (ascending ? 1 : -1) * a.observedAt.localeCompare(b.observedAt))
-  const comparing = items.filter(item => compare.includes(item.versionId))
-  return <section className="panel feature-panel stack">
-    <div className="panel-heading"><div><h2>{archive ? 'Архив финансовых продуктов' : 'Последние наблюдения витрины ПСБ'}</h2><p>{archive ? 'Датированные наблюдения из официальных публикаций. Периоды действия обычно неизвестны.' : 'Снимки витрины, датированные публикации и сведения об обслуживаемых архивных продуктах. Условия нового открытия уточняйте в банке.'}</p></div>
-      {archive ? <div className="segmented"><button aria-pressed={mode === 'year'} onClick={() => setMode('year')}>Наблюдения года</button><button aria-pressed={mode === 'asof'} onClick={() => setMode('asof')}>На дату</button></div> : <a className="button quiet" href="#archive">Открыть архив</a>}</div>
-    <div className="filter-row">
-      {!archive && <label>Год наблюдений<select value={bankYear} onChange={e => setBankYear(e.target.value)}><option value="">Последние по продуктам</option>{[2026, 2025, 2024, 2023].filter(year => year <= Number(date.slice(0, 4))).map(year => <option key={year}>{year}</option>)}</select></label>}
-      <label>Продукт или эмитент<input type="search" value={query} onChange={e => setQuery(e.target.value)}/></label>
-      <label>Категория<select value={kind} onChange={e => setKind(e.target.value)}><option value="">Все</option><option>Вклады</option><option>Накопительные счета</option>{archive && <option>ЦФА</option>}</select></label>
-      <label>Сортировка<select value={ascending ? 'asc' : 'desc'} onChange={e => setAscending(e.target.value === 'asc')}><option value="desc">Сначала новые</option><option value="asc">Сначала ранние</option></select></label>
-      <label className="inline-field"><input type="checkbox" checked={favoriteOnly} onChange={e => setFavoriteOnly(e.target.checked)}/> Избранное</label>
-    </div>
-    {items.length ? <div className="source-grid">{items.map(item => <article className="source-card" key={item.versionId}><div className="product-card-top"><span className="soft-badge">{item.kind} · {item.observedAt}</span><button className="icon-button" aria-label={`Избранное: ${item.name}`} aria-pressed={favorites.includes(item.productId)} onClick={() => toggle(item.productId)}><Star size={17} fill={favorites.includes(item.productId) ? 'currentColor' : 'none'}/></button></div>
-      <h3>{item.name}</h3><p>{item.issuer} · {item.currency ?? 'RUB'} · {observationLabel(item, date)}</p>{item.validFrom && <p>Дата вступления ставки по источнику · {item.validFrom}</p>}<details className="mini-detail"><summary>Условия ({item.terms.length})</summary><ul className="catalog-terms">{item.terms.map((term, i) => <li key={i}><b>{rateText(term)}{termText(term) !== '—' && ' · ' + termText(term)}</b>{term.min !== null && <p>От {amount(term.min, item.currency)}{term.max === null ? '' : ` до ${amount(term.max, item.currency)}`}</p>}<p>{term.criteria}</p></li>)}</ul></details>
-      <div className="toolbar wrap"><a className="text-link" href={item.source} target="_blank" rel="noreferrer">Официальный источник <ArrowUpRight size={13}/></a><button className="button quiet" aria-pressed={compare.includes(item.versionId)} disabled={!compare.includes(item.versionId) && comparing.length >= 5} onClick={() => setCompare(current => current.includes(item.versionId) ? current.filter(id => id !== item.versionId) : [...current, item.versionId])}>Сравнить</button></div>
-    </article>)}</div> : <p className="empty">{archive ? 'Для выбранного периода и фильтра нет подтверждённых строк.' : 'Для выбранных фильтров нет опубликованных наблюдений.'}</p>}
-    {comparing.length >= 2 && <div className="table-scroll"><table><thead><tr><th>Продукт</th><th>Дата</th><th>Срок</th><th>Ставка</th><th>Условия</th></tr></thead><tbody>{comparing.flatMap(item => item.terms.map((term, i) => <tr key={item.versionId + i}><td>{item.name}</td><td>{item.observedAt}</td><td>{termText(term)}</td><td>{rateText(term)}</td><td>{term.criteria}</td></tr>))}</tbody></table></div>}
+function BankResult({ outcome, name }: { outcome: ReturnType<typeof bankProjection>; name: string }) {
+  return <section className="mini-outcome" aria-label={name}>
+    <h5>{name}</h5>
+    {outcome ? <dl className="mini-result-lines">
+      <div><dt>Доход до налога</dt><dd>{rub(outcome.gross)}</dd></div>
+      <div><dt>НДФЛ</dt><dd>{outcome.tax === null ? '—' : rub(outcome.tax)}</dd></div>
+      <div><dt>Доход после налога</dt><dd>{outcome.net === null ? '—' : rub(outcome.net)}</dd></div>
+      <div><dt>Чистая доходность за срок</dt><dd>{outcome.netReturn === null ? '—' : pct(outcome.netReturn)}</dd></div>
+    </dl> : <p className="mini-muted">Для выбранной суммы и срока нет применимой точной ставки.</p>}
   </section>
+}
+
+function BankCard({ item, input, historical }: { item: ProductVersion; input: BankParameters; historical: boolean }) {
+  const { result, base, qualified, frequency } = bankScenarios(item, input)
+  const savings = item.kind === 'Накопительные счета'
+  const band = item.terms.find(term => term.rateRange)
+  const days = daysBetween(input.date, addMonths(input.date, input.months))
+  const bandFits = band?.days ? days >= band.days[0] && days <= band.days[1]
+    : band?.termDays ? band.termDays.includes(days) : Boolean(band)
+  const range = !result && bandFits && band?.rateRange && item.currency !== 'CNY' &&
+    (band.min === null || input.amount >= band.min) && (band.max === null || input.amount <= band.max)
+    ? band.rateRange.map(rate => bankProjection(input, rate, frequency)) : null
+  const status = bankStatus(item, historical)
+  const label = item.terms[0]?.criteria
+  const hasSpecial = item.terms.some(term => term.qualified || term.promotion)
+  const boundary = range && range.every(value => value?.net != null) ? range : null
+  return <Disclosure title={item.name} brief={`${descriptions[item.productId] ?? (savings ? 'Проценты на остаток' : item.currency === 'CNY' ? 'Вклад в юанях' : 'Срочный вклад')} · ${status}`} heading={<span className="mini-bank">
+    <span><span>{boundary ? 'Чистая доходность · сценарии' : 'Чистая доходность'}</span><strong data-bank-yield>{result?.netReturn != null ? pct(result.netReturn) : boundary?.map(value => pct(value!.netReturn!)).join(' – ') ?? '—'}</strong></span>
+    <span><span>Чистая прибыль</span><strong data-bank-profit>{result?.net != null ? rub(result.net) : boundary?.map(value => rub(value!.net!)).join(' – ') ?? '—'}</strong></span>
+  </span>}>
+    <section>
+      <h4>Расчёт за выбранный срок</h4>
+      <div className="bank-results">
+        <BankResult outcome={base} name={hasSpecial ? 'Без дополнительных условий' : 'Расчёт по наблюдению'}/>
+        {hasSpecial && <BankResult outcome={qualified} name="При выполнении условий"/>}
+      </div>
+      <p className="mini-muted mini-caption">{item.currency === 'CNY' ? 'Для расчёта нужны сумма в валюте, курсы на даты выплаты и точная ставка договора.'
+        : `Модель ACT/365. ${frequency === 'maturity' ? 'Проценты выплачиваются при окончании срока.' : frequency === 'capitalized' ? 'Проценты капитализируются в конце календарного месяца. Остаток последнего периода выплачивается при модельном закрытии.' : 'Месячные выплаты без капитализации.'} Движений по счёту и переноса лимита долгосрочных вкладов в модели нет.`}</p>
+    </section>
+    <section><h4>Условия продукта</h4>
+      <ul className="bank-terms">{item.terms.map((term, index) => <li key={index}>
+        <strong>{rateText(term)} · {termText(term)}</strong>
+        <span>{term.min !== null ? 'От ' + amountText(term.min, item) : 'Минимум не указан'}{term.max !== null ? ' · до ' + amountText(term.max, item) : ''}</span>
+        <span>{term.qualified || term.promotion ? 'Повышенные или специальные условия. ' : ''}{term.criteria}</span>
+      </li>)}</ul>
+    </section>
+    <div className="mini-extras">
+      {boundary && band?.rateRange && <Detail title="Чувствительность к ставке">
+        <p>Условный результат при крайних ставках из опубликованного диапазона. Ставка для выбранного срока неизвестна.</p>
+        <dl className="mini-result-lines">{boundary.map((value, i) => <div key={i}><dt>{pct(band.rateRange![i] / 100)} годовых</dt><dd>{rub(value!.net!)}</dd></div>)}</dl>
+      </Detail>}
+      <Detail title="Другие горизонты"><dl className="mini-result-lines">{slideHorizons.filter(months => months !== input.months).map(months => {
+        const other = bankScenarios(item, { ...input, months }).result
+        return <div key={months}><dt>{duration[months]}</dt><dd>{other?.net == null ? 'Нет расчёта' : `${pct(other.netReturn!)} · ${rub(other.net)}`}</dd></div>
+      })}</dl></Detail>
+      {result && <Detail title="Налог по годам"><dl className="mini-result-lines">{result.years.map(year => <div key={year.year}>
+        <dt>{year.year} · проценты {rub(year.gross)} · доступный лимит {rub(year.allowance)}</dt><dd>{year.tax === null ? '—' : rub(year.tax)}</dd>
+      </div>)}</dl><Link href={taxSource}>Разъяснения ФНС</Link></Detail>}
+      <Detail title={savings ? 'Снятие средств' : 'Досрочное расторжение'}>
+        <p>{savings ? 'Снятие может изменить остаток для расчёта процентов. Применимые условия указаны в тарифе.' : 'Ставку и порядок пересчёта при досрочном закрытии определяет договор. Условия продукта уточняйте в банке.'}</p>
+      </Detail>
+      <Detail title="Источник и дата"><p>{status} от {displayDate(item.observedAt)}.{item.validFrom && ` Редакция с ${displayDate(item.validFrom)}.`} {label}</p><Link href={item.source}>Официальный источник ПСБ</Link></Detail>
+    </div>
+  </Disclosure>
+}
+
+export function ProductCatalog({ input, historical }: { input: BankParameters; historical: boolean }) {
+  const sourceRows = historical ? productVersions.filter(item => item.observedAt.slice(0, 4) === input.date.slice(0, 4)) : productVersions
+  const rows = latestBankObservations(sourceRows, input.date)
+  return <>
+    {(['Вклады', 'Накопительные счета'] as const).map((kind, index) => {
+      const items = rows.filter(row => row.kind === kind)
+      const id = index ? 'savings-accounts' : 'deposits'
+      return <section key={kind} className="product-group" aria-labelledby={id}>
+        <h2 id={id}>{index ? kind : 'Банковские вклады'}</h2>
+        <p className="group-note">{index ? 'Ставки по счетам могут меняться.' : 'Условия и доступность открытия проверяйте в ПСБ.'}</p>
+        {items.length ? items.map(item => <BankCard key={item.productId} item={item} input={input} historical={historical}/>)
+          : <p className="group-note">Для выбранного года и даты нет наблюдений.</p>}
+      </section>
+    })}
+  </>
 }
