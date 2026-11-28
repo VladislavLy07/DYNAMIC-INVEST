@@ -1,17 +1,16 @@
 import { useId, useState, type ReactNode } from 'react'
 import { ArrowRight, ArrowUpRight, ChevronDown } from 'lucide-react'
-import { fundPeriodReturn, fundRates, fundScenario, instrumentScenario, scenarioLabels, slideHorizons, slideTaxYear, type SlideHorizon, type SlideInput, type TaxModel } from '../finance/miniSlides'
+import { fundPeriodReturn, fundRates, fundScenario, instrumentScenario, scenarioLabels, slideHorizons, type SlideHorizon, type SlideInput } from '../finance/miniSlides'
 import { fundDisclosures, type FundDisclosure, type FundProfile, type FundWeight } from '../market/fundDisclosures'
 import { instrumentSlides } from '../market/instrumentSlides'
 import { securitiesSource } from '../tax/securities'
-import { taxSource } from '../tax/deposits'
 
-const percentage = new Intl.NumberFormat('ru-RU', { style: 'percent', maximumFractionDigits: 2 })
+const percentage = new Intl.NumberFormat('ru-RU', { style: 'percent', maximumFractionDigits: 3 })
 const money = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0, maximumFractionDigits: 2 })
-const pct = (value: number) => percentage.format(value)
-const rub = (value: number) => money.format(value)
-const duration: Record<SlideHorizon, string> = { 6: '6 месяцев', 12: '1 год', 24: '2 года', 36: '3 года', 60: '5 лет' }
-const displayDate = (date: string) => date.split('-').reverse().join('.')
+export const pct = (value: number) => percentage.format(value)
+export const rub = (value: number) => money.format(value)
+export const duration: Record<SlideHorizon, string> = { 6: '6 месяцев', 12: '1 год', 24: '2 года', 36: '3 года', 60: '5 лет' }
+export const displayDate = (date: string) => date.split('-').reverse().join('.')
 
 const annotations: Record<FundProfile, { income: string; risk: string }> = {
   cash: { income: 'Результат зависит от ставок денежного рынка и дохода по инструментам портфеля.', risk: 'Снижение ставок уменьшает будущий доход. Возможны кредитные и операционные потери.' },
@@ -22,7 +21,7 @@ const annotations: Record<FundProfile, { income: string; risk: string }> = {
   gold: { income: 'Основной источник результата — изменение стоимости золота.', risk: 'Колебания цены металла и курса рубля могут привести к убытку.' },
 }
 
-function Disclosure({ title, brief, heading, children }: {
+export function Disclosure({ title, brief, heading, children }: {
   title: string
   brief: string
   heading?: ReactNode
@@ -40,11 +39,11 @@ function Disclosure({ title, brief, heading, children }: {
   </article>
 }
 
-function Detail({ title, children }: { title: string; children: ReactNode }) {
+export function Detail({ title, children }: { title: string; children: ReactNode }) {
   return <details className="mini-detail"><summary>{title}</summary><div>{children}</div></details>
 }
 
-function Link({ href, children }: { href: string; children: ReactNode }) {
+export function Link({ href, children }: { href: string; children: ReactNode }) {
   return <a href={href} className="text-link" target="_blank" rel="noreferrer">{children} <ArrowUpRight size={13} aria-hidden="true"/></a>
 }
 
@@ -74,7 +73,8 @@ function ProjectedResults({ result, name }: { result: ReturnType<typeof fundScen
   </section>
 }
 
-function FundCard({ fund, input }: { fund: FundDisclosure; input: SlideInput }) {
+function FundCard({ fund, input, date }: { fund: FundDisclosure; input: SlideInput; date: string }) {
+  const disclosed = fund.published <= date
   const rates = fundRates[fund.profile]
   const results = rates.map(rate => fundScenario(input, rate))
   const exit = fund.ticker ? 'Паи продаются на бирже через брокера, если есть ликвидность. Цена сделки может отличаться от стоимости пая по данным УК.' : 'Заявку на погашение можно подать в рабочий день. Срок выплаты и размер скидки определяются правилами фонда.'
@@ -85,15 +85,15 @@ function FundCard({ fund, input }: { fund: FundDisclosure; input: SlideInput }) 
       <h4>До налогообложения → После налогообложения</h4>
       <p className="mini-muted">{fund.distributes ? 'Изменение стоимости пая' : 'Доходность'} за {duration[input.months]} и прибыль в рублях</p>
       <div className="mini-result-grid">{scenarioLabels.map((name, i) => <ProjectedResults key={name} name={name} result={results[i]}/>)}</div>
-      <p className="mini-muted mini-caption">{input.model === 'resident' ? 'НДФЛ резидента по шкале 2026 года. Модель сохраняет эти правила на всём горизонте и учитывает указанную совместимую базу в год продажи.' : input.model === 'flat13' ? 'Упрощённый пример с НДФЛ 13% на положительный результат.' : input.model === 'nonresident' ? 'Для нерезидента налог по паям зависит от обстоятельств сделки. Здесь доступен результат до налога.' : 'Показан результат до налога.'} Входные и выходные комиссии, брокерский тариф и льготы не включены. Годовые допущения относятся к изменению стоимости пая после расходов фонда.</p>
+      <p className="mini-muted mini-caption">{input.model === 'resident' ? 'НДФЛ резидента с учётом совместимой базы в году продажи. Для будущих лет используется последняя поддерживаемая шкала.' : input.model === 'flat13' ? 'Упрощённый пример с НДФЛ 13% на положительный результат.' : input.model === 'nonresident' ? 'Для нерезидента налог по паям зависит от обстоятельств сделки. Здесь доступен результат до налога.' : 'Показан результат до налога.'} Входные и выходные комиссии, брокерский тариф и льготы не включены. Годовые допущения относятся к изменению стоимости пая после расходов фонда.</p>
       {fund.distributes && <p className="mini-muted mini-caption">КИД предусматривает выплаты по итогам квартала при наличии распределяемого дохода. Эти выплаты, их реинвестирование и налоги на них не входят в сценарий.</p>}
     </section>
     <section>
       <h4>Из чего состоит фонд</h4>
-      <p>{fund.strategy}. {fund.currency || 'Валютные доли в используемом раскрытии не указаны.'}</p>
+      <p>{fund.strategy}. {disclosed ? fund.currency || 'Валютные доли в используемом раскрытии не указаны.' : 'Доступный снимок состава опубликован после выбранной даты.'}</p>
       <div className="mini-holdings">
-        {fund.sectors.length > 0 && fund.sectorDate && <Weights items={fund.sectors} date={fund.sectorDate} label="Структура по данным страницы УК"/>}
-        {fund.holdings.length > 0 && <Weights items={fund.holdings} date={fund.kidDate} label="Крупнейшие позиции по КИД"/>}
+        {disclosed && fund.sectors.length > 0 && fund.sectorDate && <Weights items={fund.sectors} date={fund.sectorDate} label="Структура по данным страницы УК"/>}
+        {disclosed && fund.holdings.length > 0 && <Weights items={fund.holdings} date={fund.kidDate} label="Крупнейшие позиции по КИД"/>}
       </div>
       <p className="mini-muted mini-caption">КИД опубликован {displayDate(fund.published)} · Правила № {fund.id}</p>
     </section>
@@ -102,17 +102,17 @@ function FundCard({ fund, input }: { fund: FundDisclosure; input: SlideInput }) 
       <p>{annotations[fund.profile].income} {annotations[fund.profile].risk} {exit}</p>
     </section>
     <div className="mini-extras">
-      <Detail title="Историческая доходность"><p className="mini-muted">{fund.historyDate ? 'Изменение за период на ' + displayDate(fund.historyDate) : 'Изменение за период по таблице КИД. Дата оценки в заголовке таблицы не указана.'}</p>
+      {disclosed && <><Detail title="Историческая доходность"><p className="mini-muted">{fund.historyDate ? 'Изменение за период на ' + displayDate(fund.historyDate) : 'Изменение за период по таблице КИД. Дата оценки в заголовке таблицы не указана.'}</p>
         <dl className="mini-result-lines">{[6, 12, 36, 60].map(period => <div key={period}><dt>{duration[period as SlideHorizon]}</dt><dd>{fund.history[period] === undefined ? 'Нет данных' : pct(fund.history[period] / 100)}</dd></div>)}</dl>
       </Detail>
       <Detail title="Комиссии"><dl className="mini-result-lines">
         <div><dt>Из активов фонда за год</dt><dd>{fund.annualFee === null ? 'См. КИД' : `${fund.feeCap ? 'до ' : ''}${pct(fund.annualFee / 100)}`}</dd></div>
         <div><dt>Надбавка</dt><dd>{fund.entryFee || 'См. КИД'}</dd></div>
         <div><dt>Скидка</dt><dd>{fund.exitFee || 'См. КИД'}</dd></div>
-      </dl>{fund.ticker && <p className="mini-muted">На бирже дополнительно учитывайте спред и тариф брокера.</p>}</Detail>
+      </dl>{fund.ticker && <p className="mini-muted">На бирже дополнительно учитывайте спред и тариф брокера.</p>}</Detail></>}
       <Detail title="Налоговые льготы"><p>Для вычета за долгосрочное владение проверяют применимость к паям, даты покупки и реализации, срок владения и размер вычета. В сценарии вычет не применяется.</p><Link href={securitiesSource}>ФНС о налогообложении ценных бумаг</Link></Detail>
       <Detail title="Покупка и погашение">
-        <p>Фонд сформирован {displayDate(fund.formed)}. {fund.ticker ? `Биржевой тикер ${fund.ticker}. Уточните доступность сделки и цену лота у брокера.` : `Минимальная сумма по КИД — ${rub(fund.minRub)}. Каналы покупки и условия для инвестора указаны в правилах и на странице УК.`}</p>
+        <p>Фонд сформирован {displayDate(fund.formed)}. {fund.ticker ? `Биржевой тикер ${fund.ticker}. Уточните доступность сделки и цену лота у брокера.` : disclosed ? `Минимальная сумма по КИД — ${rub(fund.minRub)}. Каналы покупки указаны в правилах и на странице УК.` : 'Исторические условия покупки на выбранную дату не подтверждены.'}</p>
         <p>{exit}</p>
       </Detail>
       <Detail title="Другие горизонты"><dl className="mini-result-lines">{slideHorizons.filter(m => m !== input.months).map(months => {
@@ -127,64 +127,43 @@ function FundCard({ fund, input }: { fund: FundDisclosure; input: SlideInput }) 
   </Disclosure>
 }
 
-function InstrumentCard({ product, input, start, keyRate }: { product: typeof instrumentSlides[number]; input: SlideInput; start: string; keyRate: number }) {
-  const [rate, setRate] = useState(product.rate?.toString() ?? '')
-  const result = product.model && rate !== '' ? instrumentScenario(input, product.model, Number(rate) / 100, start, keyRate) : null
+function InstrumentCard({ product, input, start }: { product: typeof instrumentSlides[number]; input: SlideInput; start: string }) {
+  const result = product.model && product.rate !== undefined ? instrumentScenario(input, product.model, product.rate / 100, start, 0) : null
   return <Disclosure title={product.name} brief={product.brief}>
     <section>
       <h4>{product.model ? 'До налогообложения → После налогообложения' : 'Параметры расчёта'}</h4>
       {product.model ? <>
-        <label className="mini-local-rate"><span>Условная годовая {product.model === 'gold' ? 'динамика цены' : 'ставка'}, %</span><input type="number" step=".1" min={product.model === 'gold' ? -99 : 0} max="100" value={rate} onChange={e => setRate(e.target.value)}/></label>
+        <p className="mini-muted">Годовое допущение {pct((product.rate ?? 0) / 100)}. {product.tax}</p>
         <div className="mini-single-result"><ProjectedResults result={result}/></div>
-        <p className="mini-muted mini-caption">Модельный пример на {duration[input.months]}. {product.tax} {(['deposit', 'savings'].includes(product.id) && input.model === 'nonresident') ? 'Для нерезидента ставка 15% применяется к облагаемой части банковских процентов.' : ''}</p>
       </> : <p>{product.tax} Для расчёта нужна индивидуальная документация.</p>}
     </section>
     <section><h4>Как работает инструмент</h4><p>{product.economics}</p></section>
     <Detail title="Условия выхода и риски"><p>{product.exit}</p></Detail>
-    <Detail title="Официальные источники"><p><Link href={product.url}>Отраслевой источник</Link></p>
-      {['deposit', 'savings'].includes(product.id) && <p><Link href={taxSource}>ФНС о налогообложении банковских процентов</Link></p>}
-      {product.id === 'bond' && <p><a className="text-link" href="#portfolio">Конструктор капитала и калькулятор облигаций</a></p>}</Detail>
+    <Detail title="Официальные источники"><p><Link href={product.url}>Отраслевой источник</Link></p></Detail>
   </Disclosure>
 }
 
-export function useInvestmentInputs() {
-  const [amount, setAmount] = useState('1000000')
-  const [months, setMonths] = useState<SlideHorizon>(12)
-  const [model, setModel] = useState<TaxModel>('resident')
-  const [otherBase, setOtherBase] = useState('0')
-  const [keyRate, setKeyRate] = useState('21')
-  return { amount, setAmount, months, setMonths, model, setModel, otherBase, setOtherBase, keyRate, setKeyRate }
-}
-
-export function InvestmentSlides({ compact = false, start, bankCatalog, fields }: {
-  compact?: boolean
-  start: string
-  bankCatalog?: ReactNode
-  fields: ReturnType<typeof useInvestmentInputs>
-}) {
-  const { amount, setAmount, months, setMonths, model, setModel, otherBase, setOtherBase, keyRate, setKeyRate } = fields
-  const [category, setCategory] = useState<'funds' | 'other' | 'bank'>('funds')
-  const input = { amount: Number(amount), months, model, otherBase: model !== 'resident' ? 0 : otherBase === '' ? NaN : Number(otherBase) }
-  const prefix = useId()
-  return <section className="investment-slides" aria-labelledby={prefix + '-heading'}>
-    {compact && <header className="mini-section-head"><h2 id={prefix + '-heading'}>Инвестиционные продукты</h2><a className="text-link" href="#products">Весь каталог <ArrowUpRight size={15} aria-hidden="true"/></a></header>}
-    {!compact && <h2 id={prefix + '-heading'} className="sr-only">Каталог финансовых продуктов</h2>}
-    {!compact && <div className="mini-categories" aria-label="Категории продуктов">
-      {([['funds', 'Фонды УК ПСБ'], ['other', 'Другие инструменты'], ['bank', 'Вклады и счета ПСБ']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={category === id} onClick={() => setCategory(id)}>{label}</button>)}
-    </div>}
-    {category !== 'bank' && <div className="mini-controls">
-      <label><span>Сумма размещения, ₽</span><input type="number" min=".01" max="1000000000" step=".01" value={amount} onChange={e => setAmount(e.target.value)}/></label>
-      <label><span>Горизонт расчёта</span><select value={months} onChange={e => setMonths(Number(e.target.value) as SlideHorizon)}>{slideHorizons.map(m => <option key={m} value={m}>{duration[m]}</option>)}</select></label>
-      <label><span>Налоговый режим</span><select value={model} onChange={e => setModel(e.target.value as TaxModel)}><option value="resident">Резидент · {slideTaxYear}</option><option value="nonresident">Нерезидент · {slideTaxYear}</option><option value="flat13">Пример · 13%</option><option value="gross">До налогообложения</option></select></label>
-      {model === 'resident' && <label><span>Прочая совместимая база, ₽</span><input type="number" min="0" max="1000000000000" step=".01" value={otherBase} onChange={e => setOtherBase(e.target.value)}/></label>}
-      {category === 'other' && (model === 'resident' || model === 'nonresident') && <label><span>Модельный максимум ключевой ставки, %</span><input type="number" min="0" max="100" step=".01" value={keyRate} onChange={e => setKeyRate(e.target.value)}/></label>}
-    </div>}
-    <div hidden={category !== 'funds'} className="mini-list">
-      <p className="mini-list-note">Сценарная доходность до налогообложения за выбранный срок. Результаты не гарантированы.</p>
-      {fundDisclosures.slice(0, compact ? 3 : 12).map(fund => <FundCard key={fund.id} fund={fund} input={input}/>)}
-      {!compact && <><h3 className="mini-group-heading">Биржевые фонды</h3>{fundDisclosures.slice(12).map(fund => <FundCard key={fund.id} fund={fund} input={input}/>)}</>}
-    </div>
-    {!compact && <div hidden={category !== 'other'} className="mini-list">{instrumentSlides.map(product => <InstrumentCard key={product.id} product={product} input={input} start={start} keyRate={keyRate === '' ? NaN : Number(keyRate)}/>)}</div>}
-    {!compact && <div hidden={category !== 'bank'}>{bankCatalog}</div>}
-  </section>
+export function InvestmentSlides({ input, date }: { input: SlideInput; date: string }) {
+  const funds = fundDisclosures.filter(fund => fund.formed <= date)
+  const otherSections = [
+    { id: 'gold', heading: 'Золото', products: instrumentSlides.filter(product => product.id === 'gold') },
+    { id: 'dfa', heading: 'ЦФА', products: instrumentSlides.filter(product => product.id === 'dfa') },
+    { id: 'other', heading: 'Другие финансовые решения', products: instrumentSlides.filter(product => !['gold', 'dfa', 'deposit', 'savings'].includes(product.id)) },
+  ]
+  return <>
+    {([[false, 'Открытые ПИФы'], [true, 'Биржевые ПИФы']] as const).map(([exchange, heading]) => {
+      const id = exchange ? 'exchange-funds' : 'open-funds'
+      const items = funds.filter(fund => Boolean(fund.ticker) === exchange)
+      return <section className="product-group" aria-labelledby={id} key={id}>
+        <h2 id={id}>{heading}</h2>
+        <p className="group-note">Сценарная доходность за выбранный срок до налога. Результат не гарантирован.</p>
+        {items.length ? items.map(fund => <FundCard key={fund.id} fund={fund} input={input} date={date}/>)
+          : <p className="group-note">В каталоге нет подтверждённых фондов, сформированных к этой дате.</p>}
+      </section>
+    })}
+    {otherSections.map(({ id, heading, products }) => <section className="product-group" aria-labelledby={id} key={id}>
+      <h2 id={id}>{heading}</h2>
+      {products.map(product => <InstrumentCard key={product.id} product={product} input={input} start={date}/>)}
+    </section>)}
+  </>
 }

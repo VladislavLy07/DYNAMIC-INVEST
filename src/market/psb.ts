@@ -38,17 +38,17 @@ export const psbObservations: ProductVersion[] = [
     [bankTerm(14, null, null, null, 'Private Banking. Начисление на ежедневный остаток.')]),
   publication('psb-strong', 'Сильная ставка', 'Вклады', '2024-10-28', press + '2024/10/28-01',
     [[3, 21], [6, 21.6], [12, 20.5], [18, 19.5], [24, 19.2]].map(([months, rate]) =>
-      bankTerm(rate, months === 6 ? 100_000 : null, null, months, 'Ставка на новые средства. Условия по остальным суммам не раскрыты в публикации.'))),
+      ({ ...bankTerm(rate, months === 6 ? 100_000 : null, null, months, 'Ставка на новые средства. Условия по остальным суммам не раскрыты в публикации.'), qualified: true }))),
   publication('psb-narodny', 'Народный вклад', 'Вклады', '2024-11-25', press + '2024/11/25-01',
     [3, 6, 12].map(month => bankTerm(30, 50000, 50000, month, 'Фиксированная сумма размещения. Однократное открытие.'))),
   publication('psb-narodny-plus', 'Народный вклад плюс', 'Вклады', '2024-11-25', press + '2024/11/25-01',
-    [3, 6, 12].map(month => bankTerm(30, 10000, 100000, month, 'Для держателей дебетовых карт ПСБ, зарплатных клиентов и получателей пенсии на карту ПСБ.'))),
+    [3, 6, 12].map(month => ({ ...bankTerm(30, 10000, 100000, month, 'Для держателей дебетовых карт ПСБ, зарплатных клиентов и получателей пенсии на карту ПСБ.'), qualified: true }))),
   publication('psb-narodny-account', 'Народный счёт', 'Накопительные счета', '2025-09-02', press + '2025/09/02-02',
     [bankTerm(25, null, 150000, 2, 'Приветственная ставка в первые два месяца для клиентов, отвечающих условиям банка.')]),
   publication('psb-narodny', 'Народный вклад', 'Вклады', '2026-06-10', press + '2026/06/10-02',
     [[1, 30], [3, 22], [7, 20]].map(([months, rate]) => bankTerm(rate, null, null, months, 'Условия для новых вкладчиков. Для перевода пенсии действовали отдельные ставки.'))),
   publication('psb-impulse', 'Импульс', 'Накопительные счета', '2026-10-27', press + '2026/10/27-01',
-    [bankTerm(15, null, 5000000, 2, 'Новые клиенты. Первые два месяца на минимальный остаток.'), bankTerm(9, null, null, null, 'Базовая ставка после приветственного периода по данным публикации.')]),
+    [{ ...bankTerm(15, null, 5000000, 2, 'Новые клиенты. Первые два месяца на минимальный остаток.'), promotion: true }, bankTerm(9, null, null, null, 'Базовая ставка после приветственного периода по данным публикации.')]),
   publication('psb-vector', 'Вектор', 'Накопительные счета', '2026-10-27', press + '2026/10/27-01',
     [bankTerm(11.5, 3000000, null, null, 'На минимальный остаток строго свыше указанной суммы.'),
       bankTerm(11, 500000, 3000000, null, 'На минимальный остаток.'), bankTerm(10.5, null, 500000, null, 'На минимальный остаток ниже порога.'),
@@ -59,13 +59,14 @@ const snapshotAt = '2026-11-25'
 function snapshot(id: string, name: string, kind: Kind, path: string, terms: ProductTerm[], currency: Currency = 'RUB', validFrom: string | null = null): ProductVersion {
   return {
     ...publication(id, name, kind, snapshotAt, path, terms, currency), validFrom,
+    bankPayment: id === 'psb-vector' ? 'capitalized' : undefined,
     evidence: 'official-product-snapshot',
   }
 }
 
 export const psbProductSnapshots: ProductVersion[] = [
   snapshot('psb-vector', 'Вектор', 'Накопительные счета', '/personal/savingsaccount/vektor', [
-    bankTerm(13.5, .01, null, null, 'Начисление на минимальный остаток календарного месяца. Ежемесячная капитализация в последний день месяца.'),
+    { ...bankTerm(13.5, .01, null, null, 'Начисление на минимальный остаток календарного месяца. Ежемесячная капитализация в последний день месяца.'), qualified: true },
     bankTerm(12.5, .01, null, null, 'Начисление на ежедневный остаток. Ежемесячная капитализация в последний день месяца.'),
   ], 'RUB', '2026-11-10'),
   snapshot('psb-strong', 'Сильная ставка', 'Вклады', '/personal/saving', [
@@ -81,7 +82,7 @@ export const psbProductSnapshots: ProductVersion[] = [
 
 const indexCheckDate = '2026-11-28'
 function indexed(id: string, name: string, kind: Kind, path: string, terms: ProductTerm[]): ProductVersion {
-  return { ...publication(id, name, kind, indexCheckDate, path, terms), evidence: 'official-index' }
+  return { ...publication(id, name, kind, indexCheckDate, path, terms), evidence: 'official-index', storefront: 'indexed-offer' }
 }
 
 const savings = '/personal/savingsaccount'
@@ -100,13 +101,35 @@ export const psbIndexedObservations: ProductVersion[] = [
     ['psb-narodny-account', 'Народный счёт', '17.10.2025'],
     ['psb-unlimited', 'Безлимитный', '12.03.2025'],
     ['psb-samolet', 'Копим с Самолётом', '01.10.2024'],
-  ] as const).map(([id, name, before]) => indexed(id, name, 'Накопительные счета', savings, [
-    bankTerm(null, null, null, null, `Архивный счёт. Банк публикует условия обслуживания для счетов, открытых до ${before}.`),
-  ])),
+  ] as const).map(([id, name, before]) => ({ ...indexed(id, name, 'Накопительные счета', savings, [
+    bankTerm(null, null, null, null, `Условия обслуживания счетов, открытых до ${before}.`),
+  ]), storefront: 'archived' as const })),
   indexed('psb-future', 'Ставка на будущее', 'Вклады', '/personal/saving/stavka-na-budushchee', [
-    bankTerm(null, 30000, null, null, 'Вклад для участников программы долгосрочных сбережений НПФ ПСБ. Сумма ограничена первым взносом по договору ПДС. Сверьте редакцию условий.'),
+    { ...bankTerm(null, 30000, null, null, 'Вклад для участников программы долгосрочных сбережений НПФ ПСБ. Сверьте редакцию условий.'), rateRange: [15, 28], days: [32, 367], qualified: true },
   ]),
   indexed('psb-moneybox', 'Моя копилка', 'Вклады', '/personal/saving/mymoneybox', [
-    bankTerm(null, null, null, null, 'Вклад с пополнением и ежемесячной выплатой процентов. Доступность открытия и ставку уточняйте по действующим условиям.'),
+    { ...bankTerm(null, 50000, null, null, 'Пополнение и ежемесячные проценты.'), rateRange: [11, 11.99], days: [91, 367] },
+  ]),
+]
+
+const deposits = '/personal/saving'
+export const psbAdditionalStorefront: ProductVersion[] = [
+  indexed('psb-victory', 'Вклад в Победу', 'Вклады', deposits + '/vklad-v-pobedu', [
+    { ...bankTerm(null, 300000, null, null, 'Условия благотворительной акции из витрины, открытие онлайн до 14 декабря 2026.'), rateRange: [13.3, 14.3], termDays: [91, 181, 367] },
+  ]),
+  indexed('psb-narodny', 'Народный вклад', 'Вклады', deposits, [
+    { ...bankTerm(null, 10000, 150000, null, 'Доходность онлайн-предложения из витрины.'), rateRange: [16, 20], termDays: [32, 91, 122] },
+  ]),
+  { ...indexed('psb-stable', 'Стабильный доход', 'Вклады', deposits + '/stabilnyi-dokhod', [
+    { ...bankTerm(null, 50000, null, null, 'Регулярные выплаты на отдельный счёт.'), rateRange: [10.5, 14], days: [181, 731] },
+  ]), bankPayment: 'monthly' },
+  indexed('psb-metal', 'Драгоценный', 'Вклады', deposits, [
+    { ...bankTerm(null, 50000, null, null, 'Специальные условия для покупателей драгоценных металлов.'), rateRange: [14.7, 15.8], days: [91, 367], qualified: true },
+  ]),
+  indexed('psb-opportunities', 'Мои возможности', 'Вклады', deposits, [
+    { ...bankTerm(null, 50000, null, null, 'Пополнение и частичное снятие по правилам вклада.'), rateRange: [10, 11.46], days: [91, 367] },
+  ]),
+  indexed('psb-social', 'Социальный вклад', 'Вклады', '/articles/socialnyj-vklad-i-socialnyj-schet', [
+    { ...bankTerm(28, .01, 50000, null, 'Витрина указывает ставку для получателей государственной социальной поддержки.'), fixedDays: 365, qualified: true },
   ]),
 ]

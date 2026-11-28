@@ -25,6 +25,7 @@ export interface SlideInput {
   months: SlideHorizon
   model: TaxModel
   otherBase: number
+  start?: string
 }
 
 function valid({ amount, months, otherBase }: SlideInput) {
@@ -56,9 +57,11 @@ export function fundScenario(input: SlideInput, annualRate: number) {
   let tax = null
   if (input.model === 'flat13') tax = money(Decimal.max(profit, 0).times(.13))
   if (input.model === 'resident') {
-    const date = `${slideTaxYear}-12-31`
+    const sale = input.start && validDate(input.start) ? addMonths(input.start, input.months) : `${slideTaxYear}-12-31`
+    const year = Math.min(Number(sale.slice(0, 4)), slideTaxYear)
+    const date = `${year}-12-31`
     const result = securitiesTax({
-      year: slideTaxYear, resident: true, compatibleLoss: 0, otherBase: input.otherBase, withholding: 0,
+      year, resident: true, compatibleLoss: 0, otherBase: input.otherBase, withholding: 0,
       events: [{ kind: 'sale', proceeds: { date, currency: 'RUB', amount: beforeTax.toNumber() },
         basis: { date, currency: 'RUB', amount: input.amount }, expensesRub: 0 }],
     })

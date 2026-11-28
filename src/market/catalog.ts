@@ -1,4 +1,4 @@
-import { psbIndexedObservations, psbObservations, psbProductSnapshots } from './psb.ts'
+import { psbAdditionalStorefront, psbIndexedObservations, psbObservations, psbProductSnapshots } from './psb.ts'
 import type { Currency, Kind } from '../finance/model.ts'
 
 export interface ProductTerm {
@@ -10,6 +10,10 @@ export interface ProductTerm {
   rateRange?: readonly [number, number]
   rateCeiling?: number
   days?: readonly [number, number]
+  fixedDays?: number
+  termDays?: readonly number[]
+  qualified?: boolean
+  promotion?: boolean
 }
 
 export interface ProductVersion {
@@ -20,6 +24,8 @@ export interface ProductVersion {
   issuer: string
   currency?: Currency
   evidence?: 'official-product-snapshot' | 'official-index'
+  bankPayment?: 'maturity' | 'monthly' | 'capitalized'
+  storefront?: 'indexed-offer' | 'archived'
   publishedAt: string
   observedAt: string
   validFrom: string | null
@@ -35,11 +41,12 @@ export const productVersions: ProductVersion[] = [
   ...psbObservations,
   ...psbProductSnapshots,
   ...psbIndexedObservations,
+  ...psbAdditionalStorefront,
   {
     productId: 'psb-strong', versionId: 'psb-strong-2023-11-15', name: 'Сильная ставка', kind: 'Вклады', issuer: 'ПСБ',
     publishedAt: '2023-11-15', observedAt: '2023-11-15', validFrom: null, validTo: null, retrievedAt: '2026-11-27',
     source: 'https://www.psbank.ru/bank/press/news/2023/11/15-02', archiveUrl: null, completeness: 'partial',
-    terms: [{ rate: 15, min: 3_000_000, max: null, months: 36, criteria: 'Подтверждённая строка публикации для новых средств от 3 млн ₽.' }],
+    terms: [{ rate: 15, min: 3_000_000, max: null, months: 36, qualified: true, criteria: 'Подтверждённая строка публикации для новых средств от 3 млн ₽.' }],
   },
   {
     productId: 'psb-income', versionId: 'psb-income-2024-10-28', name: 'Мой доход', kind: 'Вклады', issuer: 'ПСБ',
@@ -51,19 +58,19 @@ export const productVersions: ProductVersion[] = [
     productId: 'psb-invest-income', versionId: 'psb-invest-income-2025-12-12', name: 'Инвестиционный доход', kind: 'Вклады', issuer: 'ПСБ',
     publishedAt: '2025-12-12', observedAt: '2025-12-12', validFrom: null, validTo: null, retrievedAt: '2026-11-27',
     source: 'https://www.psbank.ru/bank/press/news/2025/12/12-03', archiveUrl: null, completeness: 'partial',
-    terms: [{ rate: 16.6, min: 50000, max: null, months: 3, criteria: 'Обязательное приобретение ПИФов УК ПСБ. Указанный процент относится к депозитной части.' }],
+    terms: [{ rate: 16.6, min: 50000, max: null, months: 3, qualified: true, criteria: 'Обязательное приобретение ПИФов УК ПСБ. Указанный процент относится к депозитной части.' }],
   },
   {
     productId: 'psb-income', versionId: 'psb-income-2026-09-07', name: 'Мой доход', kind: 'Вклады', issuer: 'ПСБ',
     publishedAt: '2026-09-07', observedAt: '2026-09-07', validFrom: null, validTo: null, retrievedAt: '2026-11-27',
     source: 'https://www.psbank.ru/bank/press/news/2026/09/07-02', archiveUrl: null, completeness: 'partial',
-    terms: [{ rate: 13.8, min: 50000, max: null, months: 6, criteria: 'Для держателей Orange Premium Club или Club+, оформление в офисе.' }],
+    terms: [{ rate: 13.8, min: 50000, max: null, months: 6, qualified: true, criteria: 'Для держателей Orange Premium Club или Club+, оформление в офисе.' }],
   },
   {
     productId: 'psb-strong', versionId: 'psb-strong-2026-09-07', name: 'Сильная ставка', kind: 'Вклады', issuer: 'ПСБ',
     publishedAt: '2026-09-07', observedAt: '2026-09-07', validFrom: null, validTo: null, retrievedAt: '2026-11-27',
     source: 'https://www.psbank.ru/bank/press/news/2026/09/07-02', archiveUrl: null, completeness: 'partial',
-    terms: [[3, 13.8], [6, 14.2], [9, 14], [12, 13.9], [18, 11.5], [24, 11.5]].map(([months, rate]) => ({ rate, min: 50000, max: 10_000_000, months, criteria: 'Диапазон размещения из публикации. Новые клиенты или новые средства по критериям банка.' })),
+    terms: [[3, 13.8], [6, 14.2], [9, 14], [12, 13.9], [18, 11.5], [24, 11.5]].map(([months, rate]) => ({ rate, min: 50000, max: 10_000_000, months, qualified: true, criteria: 'Диапазон размещения из публикации. Новые клиенты или новые средства по критериям банка.' })),
   },
   {
     productId: 'tokeon-PSB25', versionId: 'tokeon-PSB25-2025-07-02', name: 'Банк ПСБ-25 · PSB25', kind: 'ЦФА', issuer: 'ПАО Банк ПСБ',

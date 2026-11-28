@@ -1,254 +1,86 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Activity, Archive, BriefcaseBusiness, CalendarDays, ChevronDown, Compass, FlaskConical, Globe2, House, Menu, Moon, PanelsTopLeft, Plus, Presentation, ReceiptText, Settings, Sun, X } from 'lucide-react'
-import { wealthMetrics } from './analytics/wealth'
+import { Settings } from 'lucide-react'
 import { dateKey } from './finance/engine'
-import { projectLedger } from './finance/ledger'
-import { currencies, validDate, type Asset, type Currency } from './finance/model'
-import { assumptions, initialScenarios, readAnnual, scenarioNames, type ScenarioInput, type ScenarioName } from './features/scenarios'
-import { loadSnapshot, snapshotFx, type Snapshot } from './market/snapshot'
-import { accountingFx, allocation, available, maxAssets, maxPortfolios, persistWorkspace, readWorkspace, replacePortfolio, type Portfolio, type Workspace } from './portfolio/workspace'
-import { AssetEditor, Portfolio as PositionTable } from './ui/Portfolio'
-import { PortfolioSettings, BackupTools } from './ui/PortfolioSettings'
-import { HistoricalHome, WealthDashboard } from './ui/WealthDashboard'
-import { MarketViews, SourceDirectory } from './ui/MarketViews'
-import { LedgerCalendar } from './ui/LedgerViews'
-import { TaxView } from './ui/TaxView'
-import { ProductCatalog, favoritesKey } from './ui/ProductCatalog'
-import { ScenarioEditor, StrategyView } from './ui/StrategyView'
-import { InvestmentSlides, useInvestmentInputs } from './ui/InvestmentSlides'
-import './style.css'
+import { slideHorizons, type SlideHorizon, type SlideInput } from './finance/miniSlides'
+import { validDate } from './finance/model'
+import type { BankParameters } from './finance/bankSlides'
+import { InvestmentSlides, Link, displayDate, duration } from './ui/InvestmentSlides'
+import { ProductCatalog } from './ui/ProductCatalog'
+import { taxSource } from './tax/deposits'
+import './single-page.css'
 
-const PrivateStudio = lazy(() => import('./ui/Studio').then(m => ({ default: m.PrivateStudio })))
-const CapitalBusinessLab = lazy(() => import('./ui/Studio').then(m => ({ default: m.CapitalBusinessLab })))
-const ArchiveCoverage = lazy(() => import('./ui/ArchiveCoverage').then(m => ({ default: m.ArchiveCoverage })))
-const Academy = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.Academy })))
-const Analyst = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.Analyst })))
-const ChinaLab = lazy(() => import('./ui/ChinaLab').then(m => ({ default: m.ChinaLab })))
-const DividendTaxView = lazy(() => import('./ui/SecuritiesTaxView').then(m => ({ default: m.DividendTaxView })))
-const SecuritiesTaxView = lazy(() => import('./ui/SecuritiesTaxView').then(m => ({ default: m.SecuritiesTaxView })))
-const PortfolioReplay = lazy(() => import('./ui/PortfolioReplay').then(m => ({ default: m.PortfolioReplay })))
-const BacktestView = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.BacktestView })))
-const ReportView = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.ReportView })))
-const GoalsAndLadder = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.GoalsAndLadder })))
-const RiskView = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.RiskView })))
-const FixedIncomeView = lazy(() => import('./ui/ResearchTools').then(m => ({ default: m.FixedIncomeView })))
-const Calculator = lazy(() => import('./ui/Calculator').then(m => ({ default: m.Calculator })))
+export function SinglePageApp() {
+  const [today] = useState(() => dateKey())
+  const [year, setYear] = useState('today')
+  const [historicalDate, setHistoricalDate] = useState('')
+  const [amount, setAmount] = useState('1000000')
+  const [months, setMonths] = useState<SlideHorizon>(12)
+  const [allowanceUsed, setAllowanceUsed] = useState(false)
+  const [assumedAllowance, setAssumedAllowance] = useState('160000')
+  const [otherBase, setOtherBase] = useState('0')
+  const [qualifies, setQualifies] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const endOfYear = year < today.slice(0, 4) ? year + '-12-31' : today
+  const date = year === 'today' ? today : historicalDate || endOfYear
+  const bankInput: BankParameters = { amount: Number(amount), date, months, allowanceUsed, assumedAllowance: Number(assumedAllowance), otherBase: Number(otherBase), qualifies }
+  const investmentInput: SlideInput = { amount: bankInput.amount, months, model: 'resident', otherBase: bankInput.otherBase, start: date }
 
-const today = dateKey()
-const todayYear = Number(today.slice(0, 4))
-const brand = import.meta.env.BASE_URL + 'brand/'
-const settingsKey = 'dynamic-invest:settings:v2'
-const pages = {
-  dashboard: { label: 'Главная', title: 'Обзор капитала', subtitle: 'Текущая оценка и сценарная траектория', icon: House },
-  portfolio: { label: 'Капитал', title: 'Конструктор капитала', subtitle: 'Портфели, договорные условия и денежный резерв', icon: BriefcaseBusiness },
-  products: { label: 'Финансовые продукты', title: 'Финансовые продукты', subtitle: 'Официальные источники и параметры инструментов', icon: PanelsTopLeft },
-  archive: { label: 'Архив', title: 'Финансовая история', subtitle: 'Архив рыночных данных и историческое моделирование', icon: Archive },
-  tax: { label: 'Налоги', title: 'Налоговая аналитика', subtitle: 'Банковские проценты и налоговые правила по годам', icon: ReceiptText },
-  scenarios: { label: 'Стратегии', title: 'Стратегии и сценарии', subtitle: 'Сравнение капитала в разных экономических условиях', icon: FlaskConical },
-  market: { label: 'Экономика и рынки', title: 'Экономика и рынки', subtitle: 'История показателей и качество источников', icon: Globe2 },
-  analytics: { label: 'Аналитический центр', title: 'Аналитический центр', subtitle: 'Риски, финансовые цели, отчётность и обучение', icon: Compass },
-  calendar: { label: 'Календарь выплат', title: 'Денежные потоки', subtitle: 'Поступления, погашения и реинвестирование', icon: CalendarDays },
-  settings: { label: 'Настройки', title: 'Настройки', subtitle: 'Оформление и резервные копии', icon: Settings },
-}
-type Page = keyof typeof pages
-type Mode = 'past' | 'present' | 'future'
-const primary: Page[] = ['dashboard', 'portfolio', 'products', 'archive', 'tax', 'scenarios', 'market', 'analytics']
-const secondary: Page[] = ['calendar', 'settings']
-const currentPage = (): Page => {
-  const name = location.hash.slice(1)
-  if (name === 'calculator') return 'analytics'
-  return Object.hasOwn(pages, name) ? name as Page : 'dashboard'
-}
-const horizons = [1, 3, 6, 12, 24, 36, 60, 120, 180, 240, 360]
-const periodLabel = (value: number) => value < 12 ? value + ' мес.' : value / 12 + ' г.'
-const defaults = { theme: 'light' as 'light' | 'dark', watermark: true, scenarios: initialScenarios }
-
-function readSettings() {
-  try {
-    const previous = localStorage.getItem(settingsKey)
-    if (!previous) return defaults
-    const parsed = JSON.parse(previous)
-    const scenarios = { ...initialScenarios }
-    for (const name of scenarioNames) {
-      const value = parsed.scenarios?.[name]
-      if (!value) continue
-      const keys = ['inflation', 'key', 'yield', 'spread', 'usd', 'cny', 'growth', 'tax'] as const
-      if (keys.every(k => typeof value[k] === 'number' && Number.isFinite(value[k]) && value[k] > -100 && value[k] <= 100) && typeof value.early === 'boolean') {
-        scenarios[name] = { ...Object.fromEntries([...keys.map(k => [k, value[k]]), ['early', value.early]]) as unknown as ScenarioInput, annual: readAnnual(value.annual) }
-      }
-    }
-    return { theme: parsed.theme === 'dark' ? 'dark' as const : 'light' as const, watermark: parsed.watermark !== false, scenarios }
-  } catch { return defaults }
-}
-
-function ConfirmRemoval({ asset, close, remove }: { asset: Asset; close: () => void; remove: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null)
-  useEffect(() => { dialog.current?.showModal() }, [])
-  return <dialog ref={dialog} className="panel dialog delete-dialog" onCancel={e => { e.preventDefault(); close() }} aria-labelledby="delete-title"><h2 id="delete-title">Удалить актив?</h2><p>«{asset.name}» будет удалён из портфеля и расчётов.</p><div className="form-actions"><button className="button quiet" autoFocus onClick={close}>Отмена</button><button className="button remove" onClick={remove}>Удалить</button></div></dialog>
-}
-
-function App() {
-  const investmentInputs = useInvestmentInputs()
-  const [page, setPage] = useState(currentPage)
-  const [settings, setSettings] = useState(readSettings)
-  const [drawer, setDrawer] = useState(false)
-  const [state, setState] = useState(() => readWorkspace(today))
-  const [editor, setEditor] = useState<{ asset?: Asset; duplicate?: boolean } | null>(null)
-  const [pendingRemove, setPendingRemove] = useState<Asset | null>(null)
-  const [mode, setMode] = useState<Mode>(currentPage() === 'archive' ? 'past' : 'present')
-  const [historical, setHistorical] = useState('2025-12-31')
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    try {
-      const values: unknown = JSON.parse(localStorage.getItem(favoritesKey) ?? '[]')
-      return Array.isArray(values) ? values.filter((value): value is string => typeof value === 'string').slice(0, 100) : []
-    } catch { return [] }
-  })
-  const [months, setMonths] = useState(12)
-  const [custom, setCustom] = useState(false)
-  const [scenario, setScenario] = useState<ScenarioName>('Базовый')
-  const [currency, setCurrency] = useState<Currency>('RUB')
-  const [presentation, setPresentation] = useState(false)
-  const [market, setMarket] = useState<Snapshot>()
-  const [marketError, setMarketError] = useState('')
-  const [taxTab, setTaxTab] = useState<'bank' | 'markets' | 'dividends'>('bank')
-  const [analysisTab, setAnalysisTab] = useState(location.hash === '#calculator' ? 'calculator' : 'analyst')
-
-  useEffect(() => {
-    const onHash = () => { const next = currentPage(); setPage(next); if (next === 'archive') setMode('past'); setDrawer(false); if (location.hash === '#calculator') setAnalysisTab('calculator'); window.scrollTo(0, 0) }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawer(false); setPresentation(false) } }
-    window.addEventListener('hashchange', onHash)
-    window.addEventListener('keydown', onKey)
-    return () => { window.removeEventListener('hashchange', onHash); window.removeEventListener('keydown', onKey) }
-  }, [])
-  useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme
-    try { if (settings !== defaults) localStorage.setItem(settingsKey, JSON.stringify(settings)) } catch { /* Applies for the current session. */ }
-  }, [settings])
-  useEffect(() => {
-    let active = true
-    loadSnapshot().then(value => { if (active) setMarket(value) }).catch(() => { if (active) setMarketError('Не удалось загрузить официальный снимок рынка.') })
-    return () => { active = false }
-  }, [])
-
-  const { data, message } = state
-  const portfolio = data.portfolios.find(p => p.id === data.active)!
-  const { fx, missing } = useMemo(() => snapshotFx(market, today, accountingFx), [market])
-  const scenarioData = settings.scenarios[scenario]
-  const options = useMemo(() => assumptions(scenarioData, portfolio, fx), [scenarioData, portfolio, fx])
-  const projection = useMemo(() => projectLedger(portfolio.assets, fx, today, months, available(portfolio), options), [fx, months, options, portfolio])
-  const annual = useMemo(() => months === 12 ? projection : projectLedger(portfolio.assets, fx, today, 12, available(portfolio), options), [fx, months, options, portfolio, projection])
-  const metrics = wealthMetrics(portfolio, fx, projection, annual, months)
-  const date = mode === 'past' ? historical : today
-  const current = pages[page]
-  const projected = presentation ? 'dashboard' : page
-
-  function update(next: Workspace) {
-    try { persistWorkspace(next); setState({ data: next, message: '' }) }
-    catch { setState({ data: next, message: 'Не удалось сохранить данные в браузере. Сделайте резервную копию JSON перед закрытием.' }) }
-  }
-  function changePortfolio(next: Portfolio) {
-    if (next.budget < allocation(next.assets)) throw new Error('Недостаточно свободного капитала. Увеличьте бюджет или уменьшите сумму приобретения.')
-    update(replacePortfolio(data, next))
-  }
-  function createPortfolio() {
-    if (data.portfolios.length >= maxPortfolios) { setState({ data, message: `Доступно до ${maxPortfolios} портфелей.` }); return }
-    const id = crypto.randomUUID()
-    update({ ...data, active: id, portfolios: [...data.portfolios, { id, name: `Портфель ${data.portfolios.length + 1}`, budget: 0, assets: [], contribution: 0, withdrawal: 0, reinvest: 0, demo: false }] })
-  }
-  function clearStorage() {
-    try { for (let i = localStorage.length - 1; i >= 0; i--) { const key = localStorage.key(i); if (key?.startsWith('dynamic-invest:')) localStorage.removeItem(key) } }
-    catch { setState({ data, message: 'Браузер не разрешил удалить локальные данные.' }); return }
-    setState(readWorkspace(today))
-    setSettings(defaults)
-    setFavorites([])
-  }
-  function toggleFavorite(id: string) {
-    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]
-    setFavorites(next)
-    try { localStorage.setItem(favoritesKey, JSON.stringify(next)) } catch { /* Session-only state. */ }
-  }
-  function navigate(target: Page) {
-    if (target === 'archive' && mode !== 'past') setMode('past')
-    setDrawer(false)
-  }
-
-  const globalControls = <div className="global-controls">
-    <div className="segmented mode-tabs" aria-label="Временной режим">{(['past', 'present', 'future'] as const).map((m, i) => <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)}>{['Прошлое', 'Настоящее', 'Будущее'][i]}</button>)}</div>
-    {mode === 'past' ? <>
-      <label className="compact-control"><span>Год</span><select aria-label="Год" value={historical.slice(0, 4)} onChange={e => setHistorical(e.target.value === String(todayYear) ? today : e.target.value + '-12-31')}>{Array.from({ length: Math.max(1, todayYear - 2022) }, (_, i) => 2023 + i).map(year => <option key={year}>{year}</option>)}</select></label>
-      <label className="compact-control"><span>Дата</span><input type="date" min="2023-01-01" max={today} value={historical} onChange={e => { if (validDate(e.target.value) && e.target.value <= today && e.target.value >= '2023-01-01') setHistorical(e.target.value) }}/></label>
-    </> : <span className="control-date"><CalendarDays size={15}/>{today}</span>}
-    <label className="compact-control"><span>Портфель</span><select value={data.active} onChange={e => update({ ...data, active: e.target.value })}>{data.portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-    <label className="compact-control"><span>Горизонт</span><select aria-label="Горизонт" value={custom ? 'custom' : months} onChange={e => { setCustom(e.target.value === 'custom'); if (e.target.value !== 'custom') setMonths(Number(e.target.value)) }}>{horizons.map(m => <option key={m} value={m}>{periodLabel(m)}</option>)}<option value="custom">Свой</option></select></label>
-    {custom && <label className="compact-control custom-months"><span>Месяцев</span><input type="number" min={1} max={360} value={months} onChange={e => setMonths(Math.min(360, Math.max(1, Math.floor(Number(e.target.value)))))}/></label>}
-    <label className="compact-control"><span>Сценарий</span><select value={scenario} onChange={e => setScenario(e.target.value as ScenarioName)}>{scenarioNames.map(name => <option key={name}>{name}</option>)}</select></label>
-    <label className="compact-control"><span>Валюта</span><select value={currency} onChange={e => setCurrency(e.target.value as Currency)}>{currencies.map(code => <option key={code}>{code}</option>)}</select></label>
-  </div>
-
-  return <div className={'app-shell' + (presentation ? ' presentation' : '')}>
-    {drawer && <button className="drawer-overlay" aria-label="Закрыть меню" onClick={() => setDrawer(false)}/>}
-    <aside className={`sidebar ${drawer ? 'drawer-open' : ''}`} aria-label="Разделы приложения">
-      <a href="#dashboard" className="brand" onClick={() => setDrawer(false)}><img src={brand + 'logo-' + settings.theme + '.svg'} alt="DYNAMIC INVEST · Wealth Intelligence"/></a>
-      <nav aria-label="Основная навигация">
-        <div className="nav-caption">РАБОЧАЯ ОБЛАСТЬ</div>
-        {primary.map(key => { const { label, icon: Icon } = pages[key]; return <a key={key} href={`#${key}`} aria-current={key === page ? 'page' : undefined} onClick={() => navigate(key)}><Icon size={18}/>{label}</a> })}
-        <div className="nav-caption nav-divider">ИНСТРУМЕНТЫ</div>
-        {secondary.map(key => { const { label, icon: Icon } = pages[key]; return <a key={key} href={`#${key}`} aria-current={key === page ? 'page' : undefined} onClick={() => navigate(key)}><Icon size={18}/>{label}</a> })}
-      </nav>
-      <div className="sidebar-footer"><div className="workspace"><span className="workspace-icon"><Activity size={16}/></span><div><b>Частный капитал</b><span>Локальное хранилище</span></div></div><div className="version"><span>Версия 6.4</span></div></div>
-    </aside>
-    <div className="main-shell">
-      <header className="topbar">
-        <div className="breadcrumb"><button className="icon-button menu-button" aria-label="Открыть меню" aria-expanded={drawer} onClick={() => setDrawer(!drawer)}>{drawer ? <X size={21}/> : <Menu size={21}/>}</button><span>Рабочая область</span><span className="crumb-sep">/</span><b>{presentation ? 'Демонстрация' : current.label}</b></div>
-        <div className="top-actions">{portfolio.demo && projected !== 'dashboard' && projected !== 'products' && <span className="demo-badge"><span/>Демопортфель</span>}
-          <button className="icon-button theme-button" aria-label={settings.theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'} onClick={() => setSettings({ ...settings, theme: settings.theme === 'dark' ? 'light' : 'dark' })}>{settings.theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button>
-          <button className="icon-button theme-button" aria-label={presentation ? 'Выйти из презентации' : 'Открыть презентацию'} aria-pressed={presentation} onClick={() => { setPresentation(!presentation); window.scrollTo(0, 0) }}>{presentation ? <X size={18}/> : <Presentation size={18}/>}</button>
+  return <main className="single-page" data-app="SinglePageApp">
+    <header className="catalog-header">
+      <h1><img src={import.meta.env.BASE_URL + 'brand/logo-light.svg'} alt="DYNAMIC INVEST" width="234" height="52"/></h1>
+    </header>
+    <section className="catalog-controls" aria-label="Общие параметры расчёта">
+      <label><span>Исторический год</span>
+        <select aria-label="Исторический год" value={year} onChange={event => { setYear(event.target.value); setHistoricalDate('') }}>
+          <option value="today">Последние</option>
+          {[2026, 2025, 2024, 2023].filter(value => value <= Number(today.slice(0, 4))).map(value => <option key={value}>{value}</option>)}
+        </select>
+      </label>
+      <label><span>Сумма размещения, ₽</span>
+        <input type="number" min=".01" max="1000000000" step=".01" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)}/>
+      </label>
+      <div className="tax-field">
+        <span id="tax-label">Лимит НДФЛ по вкладам</span>
+        <div className="tax-switch" role="group" aria-labelledby="tax-label">
+          <button type="button" aria-pressed={!allowanceUsed} onClick={() => setAllowanceUsed(false)}>Лимит свободен</button>
+          <button type="button" aria-pressed={allowanceUsed} onClick={() => setAllowanceUsed(true)}>Лимит использован</button>
         </div>
-      </header>
-      <main>
-        {!presentation && (page === 'dashboard' || page === 'products' ? <details className="workspace-controls"><summary>Параметры портфеля <ChevronDown size={15}/></summary>{globalControls}</details> : globalControls)}
-        {projected !== 'dashboard' && <div className="page-heading"><div><h1>{current.title}</h1><p>{current.subtitle}</p></div>{page === 'portfolio' && <button className="button primary" onClick={() => setEditor({})}><Plus size={18}/>Добавить актив</button>}</div>}
-        {message && <p className="notice" role="status">{message}</p>}
-        <Suspense fallback={<div className="panel empty" role="status">Загрузка раздела…</div>}>
-        {projected === 'dashboard' && (mode === 'past' && !presentation
-          ? <HistoricalHome data={market} date={date} error={marketError}/>
-          : <WealthDashboard portfolio={portfolio} metrics={metrics} projection={projection} market={market} error={marketError} today={today} fx={fx} unit={currency} watermark={settings.watermark} future={mode === 'future' || presentation} scenario={scenario} presentation={presentation} investmentPreview={<InvestmentSlides compact start={today} fields={investmentInputs}/>}/>)}
-        {projected === 'portfolio' && <div className="stack"><PortfolioSettings key={portfolio.id} portfolio={portfolio} save={changePortfolio} create={createPortfolio}/><PositionTable assets={portfolio.assets} fx={fx} edit={asset => setEditor({ asset })} duplicate={asset => setEditor({ asset, duplicate: true })} remove={setPendingRemove}/><FixedIncomeView portfolio={portfolio} start={today}/></div>}
-        {projected === 'products' && <div className="stack">
-          {mode === 'past' ? <ProductCatalog date={date} archive favorites={favorites} toggle={toggleFavorite}/> :
-            <InvestmentSlides start={today} fields={investmentInputs} bankCatalog={<ProductCatalog date={date} archive={false} favorites={favorites} toggle={toggleFavorite}/>}/>}
-          <details className="workspace-controls"><summary>Источники и ручной ввод <ChevronDown size={15}/></summary><SourceDirectory openEditor={() => setEditor({})}/></details>
-        </div>}
-        {projected === 'archive' && <div className="stack"><BacktestView key={date.slice(0, 4)} data={market} date={date}/><PortfolioReplay key={date.slice(0, 4)} data={market} date={date}/><MarketViews data={market} date={date} error={marketError} archive/><ProductCatalog date={date} archive favorites={favorites} toggle={toggleFavorite}/><ArchiveCoverage date={date}/></div>}
-        {projected === 'tax' && <div className="stack"><div className="segmented analysis-tabs" aria-label="Налоговые инструменты"><button aria-pressed={taxTab === 'bank'} onClick={() => setTaxTab('bank')}>Банковские проценты</button><button aria-pressed={taxTab === 'markets'} onClick={() => setTaxTab('markets')}>Ценные бумаги</button><button aria-pressed={taxTab === 'dividends'} onClick={() => setTaxTab('dividends')}>Дивиденды</button></div>
-          {taxTab === 'bank' ? <TaxView key={date.slice(0, 4)} data={market} assets={portfolio.assets} projection={projection} defaultYear={Number(date.slice(0, 4))}/> : taxTab === 'markets' ? <SecuritiesTaxView key={date.slice(0, 4)} data={market} defaultYear={Number(date.slice(0, 4))}/> : <DividendTaxView defaultYear={Number(date.slice(0, 4))}/>}</div>}
-        {projected === 'scenarios' && <div className="stack"><ScenarioEditor firstYear={todayYear} active={scenario} scenarios={settings.scenarios} edit={(key, value) => setSettings({ ...settings, scenarios: { ...settings.scenarios, [key]: value } })}/><StrategyView portfolios={data.portfolios} active={portfolio} scenarios={settings.scenarios} selected={scenario} fx={fx} today={today} months={months}/></div>}
-        {projected === 'market' && <MarketViews data={market} date={date} error={marketError}/>}
-        {projected === 'calendar' && <LedgerCalendar key={portfolio.id} projection={projection}/>}
-        {projected === 'analytics' && <div className="stack"><div className="segmented analysis-tabs" aria-label="Аналитические инструменты">{[['analyst', 'Аналитик'], ['risk', 'Риски'], ['goals', 'Цели и лестница'], ['report', 'Отчёт'], ['calculator', 'Калькулятор'], ['academy', 'Академия'], ['studio', 'Private Banking Studio'], ['business', 'Capital Business Lab'], ['china', 'RUB / CNY']].map(([key, label]) => <button key={key} aria-pressed={analysisTab === key} onClick={() => setAnalysisTab(key)}>{label}</button>)}</div>
-          {analysisTab === 'analyst' && <Analyst p={portfolio} fx={fx} projection={projection}/>}
-          {analysisTab === 'risk' && <RiskView portfolio={portfolio} fx={fx} projection={projection}/>}
-          {analysisTab === 'goals' && <GoalsAndLadder key={portfolio.id} start={today} initial={projection.opening}/>}
-          {analysisTab === 'report' && <ReportView portfolio={portfolio} projection={projection} date={today} fx={fx} watermark={settings.watermark}/>}
-          {analysisTab === 'calculator' && <Calculator/>}
-          {analysisTab === 'academy' && <Academy/>}
-          {analysisTab === 'studio' && <PrivateStudio portfolio={portfolio} fx={fx} start={today} months={months} scenario={scenarioData} watermark={settings.watermark}/>}
-          {analysisTab === 'business' && <CapitalBusinessLab/>}
-          {analysisTab === 'china' && <ChinaLab data={market} date={date}/>}
-        </div>}
-        {projected === 'settings' && <div className="stack"><section className="panel feature-panel"><h2>Оформление</h2><div className="check-list"><label><input type="checkbox" checked={settings.watermark} onChange={e => setSettings({ ...settings, watermark: e.target.checked })}/> Показывать фирменный водяной знак</label></div></section><BackupTools data={data} restore={update} append={assets => changePortfolio({ ...portfolio, assets: [...portfolio.assets, ...assets] })} clear={clearStorage}/></div>}
-        </Suspense>
-        <footer className="content-footer"><span>Исследовательская версия · оценки портфеля и сценарии зависят от введённых данных</span><span>{missing.length ? `Резервные курсы: ${missing.join(', ')}` : 'Курсы оценки · Банк России'} · бюджет в RUB</span></footer>
-      </main>
-    </div>
-    {editor && <AssetEditor today={today} asset={editor.asset} duplicate={editor.duplicate} close={() => setEditor(null)} save={asset => {
-      if ((!editor.asset || editor.duplicate) && portfolio.assets.length >= maxAssets) throw new Error(`Открыто максимальное количество позиций (${maxAssets}).`)
-      changePortfolio({ ...portfolio, assets: editor.asset && !editor.duplicate ? portfolio.assets.map(a => a.id === asset.id ? asset : a) : [...portfolio.assets, asset] })
-      setEditor(null)
-    }}/>}
-    {pendingRemove && <ConfirmRemoval asset={pendingRemove} close={() => setPendingRemove(null)} remove={() => { changePortfolio({ ...portfolio, assets: portfolio.assets.filter(a => a.id !== pendingRemove.id) }); setPendingRemove(null) }}/>}
-  </div>
+      </div>
+      <label><span>Горизонт</span>
+        <select aria-label="Горизонт" value={months} onChange={event => setMonths(Number(event.target.value) as SlideHorizon)}>
+          {slideHorizons.map(value => <option key={value} value={value}>{duration[value]}</option>)}
+        </select>
+      </label>
+      <button className="calc-settings" type="button" aria-expanded={showSettings} aria-controls="settings-fields"
+        aria-label="Параметры расчёта" title="Параметры расчёта" onClick={() => setShowSettings(value => !value)}><Settings size={19} aria-hidden="true"/></button>
+      <div id="settings-fields" className="settings-fields" hidden={!showSettings}>
+        {year !== 'today' && <label><span>Дата наблюдения</span><input type="date" min={year + '-01-01'} max={endOfYear} value={date}
+          onChange={event => { const next = event.target.value; if (validDate(next) && next.startsWith(year + '-') && next <= endOfYear) setHistoricalDate(next) }}/></label>}
+        <label><span>Расчётный лимит для неполного года, ₽</span>
+          <input type="number" min="0" max="1000000" step="1000" value={assumedAllowance} onChange={event => setAssumedAllowance(event.target.value)}/>
+        </label>
+        <label><span>Прочая совместимая налоговая база, ₽</span>
+          <input type="number" min="0" max="1000000000000" step=".01" value={otherBase} onChange={event => setOtherBase(event.target.value)}/>
+        </label>
+        <label className="condition-check"><input type="checkbox" checked={qualifies} onChange={event => setQualifies(event.target.checked)}/>
+          <span>Рассчитать вариант с выполнением условий банка</span></label>
+      </div>
+    </section>
+    <ProductCatalog input={bankInput} historical={year !== 'today'}/>
+    <InvestmentSlides input={investmentInput} date={date}/>
+    <footer className="catalog-footer">
+      <h2>Источники и дата обновления</h2>
+      <p>Банковские наблюдения проверены {displayDate('2026-11-28')}. Снимок раскрытий по фондам проверен {displayDate('2026-11-27')}.</p>
+      <ul>
+        <li><Link href="https://www.psbank.ru/personal/saving">ПСБ · вклады</Link></li>
+        <li><Link href="https://www.psbank.ru/personal/savingsaccount">ПСБ · накопительные счета</Link></li>
+        <li><Link href="https://www.upravlyaem.ru/disclosure/mutual_funds/">УК ПСБ · открытые фонды</Link></li>
+        <li><Link href="https://www.upravlyaem.ru/disclosure/BPIF/">УК ПСБ · биржевые фонды</Link></li>
+        <li><Link href={taxSource}>ФНС · банковские проценты</Link></li>
+      </ul>
+    </footer>
+  </main>
 }
 
-createRoot(document.getElementById('root')!).render(<App/>)
+createRoot(document.getElementById('root')!).render(<SinglePageApp/>)
